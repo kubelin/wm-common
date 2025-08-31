@@ -8,6 +8,8 @@ build/
 # Eclipse
 .metadata
 bin/
+bin/*
+bin/*.*
 tmp/
 *.tmp
 *.bak
@@ -19,6 +21,7 @@ local.properties
 .recommenders
 .project
 .classpath
+.class
 
 # STS (Spring Tool Suite)
 .apt_generated
