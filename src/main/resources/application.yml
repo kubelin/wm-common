@@ -1,0 +1,31 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /wm-common
+
+spring:
+  application:
+    name: wm-common
+  profiles:
+    active: local
+  
+  jackson:
+    default-property-inclusion: non_null
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Seoul
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    com.samsung.wm: INFO
+    com.samsung.common: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
