@@ -2,9 +2,7 @@ package com.samsung.common.service;
 
 import com.samsung.common.constants.ErrorCodes;
 import com.samsung.common.util.StringUtil;
-import com.samsung.common.dao.CommonDAO;
 import com.samsung.common.response.CommonResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +13,7 @@ import java.util.Map;
  * 모든 C 파일 변환 서비스의 공통 로직을 처리
  */
 @Slf4j
-@RequiredArgsConstructor
 public abstract class AbstractModuleService implements ModuleService {
-    
-    protected final CommonDAO dao;
     
     @Override
     @Transactional

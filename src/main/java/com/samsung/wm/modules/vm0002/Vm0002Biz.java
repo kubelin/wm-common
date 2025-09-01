@@ -1,7 +1,11 @@
 package com.samsung.wm.modules.vm0002;
 
-import com.samsung.common.dao.CommonDAO;
 import com.samsung.common.service.AbstractModuleService;
+import com.samsung.wm.modules.vm0001.dto.CustomerDto;
+import com.samsung.wm.modules.vm0002.dao.Vm0002Dao;
+import com.samsung.wm.modules.vm0002.dto.AccountDto;
+import com.samsung.wm.modules.vm0002.dto.InquiryLogDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -19,11 +23,10 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class Vm0002Biz extends AbstractModuleService {
     
-    public Vm0002Biz(CommonDAO dao) {
-        super(dao);
-    }
+    private final Vm0002Dao vm0002Dao;
     
     @Override
     public String getServiceId() {
@@ -59,70 +62,52 @@ public class Vm0002Biz extends AbstractModuleService {
         
         try {
             // 1. 고객 존재 확인 (vm0002.c의 check_customer_exists 함수 역할)
-            Map<String, Object> customer = dao.selectOne(
-                "vm0002.checkCustomer",
-                Map.of("customerId", customerId),
-                Map.class
-            );
+            CustomerDto customer = vm0002Dao.checkCustomer(customerId);
             
             if (customer == null) {
                 log.warn("[vm0002] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
-                return Map.of(
-                    "resultCode", "404",
-                    "message", "고객을 찾을 수 없습니다",
-                    "customerId", customerId
-                );
+                Map<String, Object> notFoundResult = new HashMap<>();
+                notFoundResult.put("resultCode", "404");
+                notFoundResult.put("message", "고객을 찾을 수 없습니다");
+                notFoundResult.put("customerId", customerId);
+                return notFoundResult;
             }
             
             // 2. 계좌 목록 조회 (vm0002.c의 select_account_list 함수 역할)
-            Map<String, Object> queryParams = new HashMap<>();
-            queryParams.put("customerId", customerId);
-            if (accountType != null) {
-                queryParams.put("accountType", accountType);
-            }
-            
-            List<Map<String, Object>> accounts = dao.selectMapList(
-                "vm0002.selectAccountList",
-                queryParams
-            );
+            List<AccountDto> accounts = vm0002Dao.selectAccountList(customerId, accountType);
             
             // 3. 총 잔고 계산 (vm0002.c의 calculate_total_balance 함수 역할)
             BigDecimal totalBalance = accounts.stream()
-                .map(account -> new BigDecimal(account.get("balance").toString()))
+                .map(account -> account.getBalance())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
             
-            // 4. 계좌별 잔고 정보 보강 (불변 맵을 가변 맵으로 변환)
-            List<Map<String, Object>> enrichedAccounts = accounts.stream()
-                .map(account -> {
-                    Map<String, Object> mutableAccount = new HashMap<>(account);
-                    // 계좌별 추가 정보 조회 (vm0002.c의 get_account_detail 함수 역할)
-                    String accountNo = (String) mutableAccount.get("accountNo");
-                    mutableAccount.put("lastTransactionTime", LocalDateTime.now().minusDays(1));
-                    mutableAccount.put("interestRate", calculateInterestRate((String) mutableAccount.get("accountType")));
-                    return mutableAccount;
-                })
-                .toList();
+            // 4. 계좌별 잔고 정보 보강 (vm0002.c의 get_account_detail 함수 역할)
+            accounts.forEach(account -> {
+                account.setLastTransactionTime(LocalDateTime.now().minusDays(1));
+                account.setInterestRate(calculateInterestRate(account.getAccountType()));
+            });
             
             // 5. 조회 로그 기록 (vm0002.c의 insert_inquiry_log 함수 역할)
-            Map<String, Object> logData = new HashMap<>();
-            logData.put("customerId", customerId);
-            logData.put("inquiryType", "BALANCE");
-            logData.put("inquiryTime", LocalDateTime.now());
-            logData.put("accountCount", enrichedAccounts.size());
-            dao.insert("vm0002.insertInquiryLog", logData);
+            InquiryLogDto inquiryLog = InquiryLogDto.builder()
+                    .customerId(customerId)
+                    .inquiryType("BALANCE")
+                    .inquiryTime(LocalDateTime.now())
+                    .accountCount(accounts.size())
+                    .build();
+            vm0002Dao.insertInquiryLog(inquiryLog);
             
             // 6. 결과 반환
             Map<String, Object> result = new HashMap<>();
             result.put("resultCode", "200");
             result.put("message", "계좌잔고 조회 성공");
             result.put("customerId", customerId);
-            result.put("accountCount", enrichedAccounts.size());
+            result.put("accountCount", accounts.size());
             result.put("totalBalance", totalBalance);
-            result.put("accounts", enrichedAccounts);
+            result.put("accounts", accounts);
             result.put("inquiryTime", LocalDateTime.now());
             
             log.info("[vm0002] 계좌잔고 조회 완료 - customerId: {}, 계좌수: {}, 총잔고: {}", 
-                    customerId, enrichedAccounts.size(), totalBalance);
+                    customerId, accounts.size(), totalBalance);
             
             return result;
             

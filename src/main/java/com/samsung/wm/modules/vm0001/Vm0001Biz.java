@@ -1,7 +1,10 @@
 package com.samsung.wm.modules.vm0001;
 
-import com.samsung.common.dao.CommonDAO;
 import com.samsung.common.service.AbstractModuleService;
+import com.samsung.wm.modules.vm0001.dao.Vm0001Dao;
+import com.samsung.wm.modules.vm0001.dto.AccessLogDto;
+import com.samsung.wm.modules.vm0001.dto.CustomerDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -17,11 +20,10 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class Vm0001Biz extends AbstractModuleService {
     
-    public Vm0001Biz(CommonDAO dao) {
-        super(dao);
-    }
+    private final Vm0001Dao vm0001Dao;
     
     @Override
     public String getServiceId() {
@@ -47,11 +49,7 @@ public class Vm0001Biz extends AbstractModuleService {
         
         try {
             // 1. 고객 정보 조회 (vm0001.c의 select_customer 함수 역할)
-            Map<String, Object> customer = dao.selectOne(
-                "vm0001.selectCustomer", 
-                Map.of("customerId", customerId), 
-                Map.class
-            );
+            CustomerDto customer = vm0001Dao.selectCustomer(customerId);
             
             if (customer == null) {
                 log.warn("[vm0001] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
@@ -63,19 +61,15 @@ public class Vm0001Biz extends AbstractModuleService {
             }
             
             // 2. 접근 로그 기록 (vm0001.c의 insert_access_log 함수 역할)
-            Map<String, Object> logData = new HashMap<>();
-            logData.put("customerId", customerId);
-            logData.put("accessTime", LocalDateTime.now());
-            logData.put("accessType", "INQUIRY");
-            
-            dao.insert("vm0001.insertAccessLog", logData);
+            AccessLogDto accessLog = AccessLogDto.builder()
+                    .customerId(customerId)
+                    .accessType("INQUIRY")
+                    .accessTime(LocalDateTime.now())
+                    .build();
+            vm0001Dao.insertAccessLog(accessLog);
             
             // 3. 고객 상태 업데이트 (vm0001.c의 update_last_access 함수 역할)
-            Map<String, Object> updateData = new HashMap<>();
-            updateData.put("customerId", customerId);
-            updateData.put("lastAccessTime", LocalDateTime.now());
-            
-            dao.update("vm0001.updateLastAccess", updateData);
+            vm0001Dao.updateLastAccess(customerId, LocalDateTime.now());
             
             // 4. 결과 반환
             Map<String, Object> result = new HashMap<>();

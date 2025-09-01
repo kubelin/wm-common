@@ -9,10 +9,35 @@ spring:
   profiles:
     active: local
   
+  # H2 Database (Demo)
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+  
+  h2:
+    console:
+      enabled: true
+  
+  sql:
+    init:
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+      mode: always
+  
   jackson:
     default-property-inclusion: NON_NULL
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Seoul
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.samsung.wm.modules.**.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    use-generated-keys: true
 
 management:
   endpoints:

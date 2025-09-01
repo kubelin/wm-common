@@ -2,6 +2,7 @@ package com.samsung.wm;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.mybatis.spring.annotation.MapperScan;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @SpringBootApplication(scanBasePackages = {"com.samsung.wm", "com.samsung.common"})
+@MapperScan("com.samsung.wm.modules.**.dao")
 public class WmCommonApplication {
 
     public static void main(String[] args) {
