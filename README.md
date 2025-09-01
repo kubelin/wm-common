@@ -29,25 +29,62 @@ vm0002.c + vm0002.h  →  Vm0002Biz.java (비즈니스 로직)
 ...
 vm9999.c + vm9999.h  →  Vm9999Biz.java (비즈니스 로직)
 
-+ 공통 인프라 6개 파일:
++ 공통 인프라 파일들:
   - ModuleService.java (인터페이스)
   - AbstractModuleService.java (공통 로직)
   - ModuleServiceFactory.java (팩토리)
   - CommonModuleController.java (REST API)
-  - CommonDAO.java (데이터 접근)
+  - 모듈별 MyBatis DAO 인터페이스들
+  - 모듈별 DTO 클래스들
   - CommonResponse.java (응답 형식)
 ```
 
 ## 📋 구현 가이드
 
-### 1. 각 C 파일별 Biz 클래스 생성
+### 1. MyBatis 아키텍처 구조
+
+#### A. 모듈별 DAO 인터페이스 생성 (@Mapper 어노테이션 사용)
+```java
+@Mapper
+public interface Vm0001Dao {
+    
+    @Select("SELECT customer_id as customerId, customer_name as customerName " +
+            "FROM customer WHERE customer_id = #{customerId}")
+    CustomerDto selectCustomer(@Param("customerId") String customerId);
+    
+    @Insert("INSERT INTO access_log (customer_id, access_type, access_time) " +
+            "VALUES (#{customerId}, #{accessType}, #{accessTime})")
+    int insertAccessLog(AccessLogDto accessLog);
+    
+    @Update("UPDATE customer SET last_access_time = #{lastAccessTime} " +
+            "WHERE customer_id = #{customerId}")
+    int updateLastAccess(@Param("customerId") String customerId, 
+                        @Param("lastAccessTime") LocalDateTime lastAccessTime);
+}
+```
+
+#### B. 모듈별 DTO 클래스 생성
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CustomerDto {
+    private String customerId;
+    private String customerName;
+    private String status;
+    private String createTime;
+    private LocalDateTime lastAccessTime;
+}
+```
+
+#### C. 각 C 파일별 Biz 클래스 생성 (MyBatis DAO 주입)
 ```java
 @Service
+@RequiredArgsConstructor
 public class Vm0001Biz extends AbstractModuleService {
     
-    public Vm0001Biz(CommonDAO dao) {
-        super(dao);
-    }
+    private final Vm0001Dao vm0001Dao;  // MyBatis DAO 주입
     
     @Override
     public String getServiceId() {
@@ -63,110 +100,190 @@ public class Vm0001Biz extends AbstractModuleService {
     
     @Override
     protected Object executeBusinessLogic(Map<String, Object> input) {
-        // C 파일의 main 함수 로직을 Java로 변환
         String customerId = (String) input.get("customerId");
         
-        // C의 함수들을 순서대로 변환:
-        // 1. check_customer_exists() → dao.selectOne()
-        // 2. select_customer_info() → dao.selectOne() 
-        // 3. insert_access_log() → dao.insert()
-        // 4. update_last_access() → dao.update()
+        // C의 함수들을 MyBatis DAO로 변환:
+        // 1. select_customer() → vm0001Dao.selectCustomer()
+        CustomerDto customer = vm0001Dao.selectCustomer(customerId);
         
-        return result;
+        // 2. insert_access_log() → vm0001Dao.insertAccessLog()
+        AccessLogDto accessLog = AccessLogDto.builder()
+            .customerId(customerId)
+            .accessType("INQUIRY")
+            .accessTime(LocalDateTime.now())
+            .build();
+        vm0001Dao.insertAccessLog(accessLog);
+        
+        // 3. update_last_access() → vm0001Dao.updateLastAccess()
+        vm0001Dao.updateLastAccess(customerId, LocalDateTime.now());
+        
+        return Map.of(
+            "resultCode", "200",
+            "customerInfo", customer,
+            "message", "고객정보 조회 성공"
+        );
     }
 }
 ```
 
-### 2. C 함수 → Java 메소드 변환 패턴
-```c
-// C 파일 예시 (vm0001.c)
-int check_customer_exists(char* customer_id) {
-    // SQL 실행
-    return result;
-}
+### 2. 데이터베이스 스키마 설정
 
-int select_customer_info(char* customer_id, customer_info_t* info) {
-    // 고객 정보 조회
-    return 0;
-}
+#### A. H2 Database + MyBatis 설정 (application.yml)
+```yaml
+spring:
+  # H2 Database (Demo)
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: 
+  
+  h2:
+    console:
+      enabled: true
+  
+  sql:
+    init:
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+      mode: always
 
-void insert_access_log(char* customer_id) {
-    // 접근 로그 기록
-}
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.samsung.wm.modules.**.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    use-generated-keys: true
 ```
 
-```java
-// Java 변환 (Vm0001Biz.java)
-@Override
-protected Object executeBusinessLogic(Map<String, Object> input) {
-    String customerId = (String) input.get("customerId");
-    
-    // check_customer_exists → dao.selectOne
-    Map<String, Object> customer = dao.selectOne(
-        "vm0001.checkCustomer",
-        Map.of("customerId", customerId),
-        Map.class
-    );
-    
-    if (customer == null) {
-        return Map.of("resultCode", "404", "message", "고객을 찾을 수 없습니다");
-    }
-    
-    // select_customer_info → dao.selectOne  
-    Map<String, Object> customerInfo = dao.selectOne(
-        "vm0001.selectCustomer",
-        Map.of("customerId", customerId),
-        Map.class
-    );
-    
-    // insert_access_log → dao.insert
-    dao.insert("vm0001.insertAccessLog", Map.of(
-        "customerId", customerId,
-        "accessTime", LocalDateTime.now()
-    ));
-    
-    return Map.of(
-        "resultCode", "200",
-        "customerInfo", customerInfo
-    );
-}
+#### B. 데이터베이스 스키마 (schema.sql)
+```sql
+-- 고객 테이블 (customer_info_t)
+CREATE TABLE IF NOT EXISTS customer (
+    customer_id VARCHAR(20) PRIMARY KEY,
+    customer_name VARCHAR(100) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    create_time VARCHAR(20) NOT NULL,
+    last_access_time TIMESTAMP
+);
+
+-- 접근 로그 테이블 (access_log_t)
+CREATE TABLE IF NOT EXISTS access_log (
+    log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customer_id VARCHAR(20) NOT NULL,
+    access_type VARCHAR(20) NOT NULL,
+    access_time TIMESTAMP NOT NULL,
+    FOREIGN KEY (customer_id) REFERENCES customer(customer_id)
+);
 ```
 
-### 3. REST API 사용법
+#### C. 테스트 데이터 (data.sql)
+```sql
+-- 고객 데이터
+INSERT INTO customer (customer_id, customer_name, status, create_time) VALUES 
+('CUST001', '홍길동', 'ACTIVE', '2025-01-01'),
+('CUST002', '김철수', 'ACTIVE', '2025-01-02');
+```
+
+### 3. MyBatis + Factory 패턴 통합 구조
+
+```
+src/main/java/com/samsung/
+├── common/                     # Factory 패턴 공통 인프라  
+│   ├── factory/
+│   │   └── ModuleServiceFactory.java    # 서비스 팩토리
+│   ├── service/
+│   │   ├── ModuleService.java           # 서비스 인터페이스
+│   │   └── AbstractModuleService.java   # 공통 로직
+│   └── response/
+│       └── CommonResponse.java          # 통합 응답 형식
+└── wm/                         # 모듈별 구현
+    ├── controller/
+    │   └── CommonModuleController.java  # 단일 REST 컨트롤러
+    └── modules/                # C 파일별 모듈 (MyBatis 구조)
+        ├── vm0001/
+        │   ├── Vm0001Biz.java         # 비즈니스 로직  
+        │   ├── dao/
+        │   │   └── Vm0001Dao.java     # MyBatis @Mapper
+        │   └── dto/
+        │       ├── CustomerDto.java    # 고객 DTO
+        │       └── AccessLogDto.java   # 접근로그 DTO
+        ├── vm0002/
+        │   ├── Vm0002Biz.java         # 비즈니스 로직
+        │   ├── dao/ 
+        │   │   └── Vm0002Dao.java     # MyBatis @Mapper
+        │   └── dto/
+        │       ├── AccountDto.java     # 계좌 DTO
+        │       └── InquiryLogDto.java  # 조회로그 DTO
+        └── ...                        # 1000개 모듈
+```
+
+### 4. REST API 사용법
 ```bash
 # 모든 등록된 서비스 조회
 GET /api/module/services
 
-# 특정 서비스 존재 확인  
-GET /api/module/vm0001/exists
-
-# 서비스 실행 (C 파일의 main 함수 호출과 동일)
+# vm0001 고객정보 조회 서비스 실행
 POST /api/module/vm0001
 {
   "customerId": "CUST001"
 }
 
-# 응답
+# 응답 예시
 {
   "success": true,
   "code": "0000", 
   "message": "vm0001 처리 완료",
   "data": {
     "resultCode": "200",
-    "customerInfo": { ... }
+    "customerInfo": {
+      "customerId": "CUST001",
+      "customerName": "홍길동",
+      "status": "ACTIVE",
+      "createTime": "2025-01-01"
+    },
+    "message": "고객정보 조회 성공"
+  }
+}
+
+# vm0002 계좌잔고 조회 서비스 실행  
+POST /api/module/vm0002
+{
+  "customerId": "CUST001"
+}
+
+# 응답 예시
+{
+  "success": true,
+  "code": "0000",
+  "message": "vm0002 처리 완료", 
+  "data": {
+    "resultCode": "200",
+    "customerId": "CUST001",
+    "accountCount": 2,
+    "totalBalance": 1500000.00,
+    "accounts": [
+      {
+        "accountNo": "1001-001-001",
+        "accountType": "SAVINGS", 
+        "balance": 1000000.00
+      }
+    ]
   }
 }
 ```
 
 ## 🔧 개발 절차
 
-### 단계별 변환 프로세스
-1. **C 파일 분석**: 함수 목록, 입력/출력, 에러 처리 패턴 파악
+### MyBatis 아키텍처 기반 변환 프로세스
+1. **C 파일 분석**: 함수 목록, 구조체 정의, SQL 패턴 파악
 2. **ServiceId 결정**: C 파일명을 기반으로 고유 ID 생성 (vm0001)
-3. **입력 검증 구현**: validateInput() 메소드에 C의 입력 체크 로직 변환
-4. **비즈니스 로직 변환**: executeBusinessLogic()에 C 함수들을 순서대로 변환
-5. **DAO 쿼리 매핑**: C의 SQL을 MyBatis XML로 변환
-6. **테스트**: REST API로 기능 검증
+3. **DTO 클래스 생성**: C 구조체를 Java DTO로 변환 (@Data, @Builder 사용)
+4. **MyBatis DAO 생성**: @Mapper 인터페이스로 데이터 접근 레이어 구현
+5. **비즈니스 로직 변환**: executeBusinessLogic()에서 MyBatis DAO 메소드 호출
+6. **데이터베이스 스키마**: C 구조체를 기반으로 테이블 스키마 생성  
+7. **테스트**: REST API로 MyBatis 연동 및 기능 검증
 
 ### 변환 우선순위
 1. **핵심 업무 모듈** (고객 조회, 계좌 관리 등)
@@ -178,7 +295,7 @@ POST /api/module/vm0001
 
 ```
 src/main/java/com/samsung/
-├── common/                    # 공통 인프라 + 유틸리티
+├── common/                    # Factory 패턴 공통 인프라 + 유틸리티
 │   ├── calc/                  # 계산 유틸리티 (C → Java 변환)
 │   │   ├── FinancialCalculator.java
 │   │   └── StatisticsCalculator.java
@@ -186,8 +303,6 @@ src/main/java/com/samsung/
 │   │   └── ErrorCodes.java
 │   ├── converter/
 │   │   └── DataConverter.java
-│   ├── dao/
-│   │   └── CommonDAO.java     # Factory 패턴용 공통 DAO
 │   ├── factory/
 │   │   └── ModuleServiceFactory.java  # 서비스 팩토리
 │   ├── response/
@@ -199,14 +314,26 @@ src/main/java/com/samsung/
 │       ├── StringUtil.java
 │       ├── DateUtil.java
 │       └── ValidationUtil.java
-└── wm/                        # Factory 패턴 모듈
-    ├── WmCommonApplication.java       # Spring Boot 메인
+└── wm/                        # MyBatis + Factory 패턴 모듈
+    ├── WmCommonApplication.java       # Spring Boot 메인 (@MapperScan 설정)
     ├── controller/
     │   └── CommonModuleController.java # 단일 REST 컨트롤러
-    └── modules/               # C 파일별 모듈 (1000개)
-        ├── vm0001/Vm0001Biz.java
-        ├── vm0002/Vm0002Biz.java
-        └── ...
+    └── modules/               # C 파일별 모듈 (MyBatis 구조)
+        ├── vm0001/            # 고객정보 조회 모듈
+        │   ├── Vm0001Biz.java         # 비즈니스 로직
+        │   ├── dao/
+        │   │   └── Vm0001Dao.java     # @Mapper 인터페이스
+        │   └── dto/
+        │       ├── CustomerDto.java    # 고객 DTO
+        │       └── AccessLogDto.java   # 접근로그 DTO  
+        ├── vm0002/            # 계좌잔고 조회 모듈
+        │   ├── Vm0002Biz.java         # 비즈니스 로직
+        │   ├── dao/
+        │   │   └── Vm0002Dao.java     # @Mapper 인터페이스
+        │   └── dto/
+        │       ├── AccountDto.java     # 계좌 DTO
+        │       └── InquiryLogDto.java  # 조회로그 DTO
+        └── ...                # 1000개 모듈 (동일한 구조)
 
 ## 🚀 시작하기
 
@@ -627,12 +754,14 @@ docker run -p 8080:8080 wm-common
 
 이 프로젝트는 Factory 패턴과 기존 C → Java 변환 유틸리티를 통합한 구조입니다:
 
-### Factory 패턴 모듈 (신규)
+### MyBatis + Factory 패턴 통합 모듈 
 - **ModuleService**: 모든 C 파일 변환을 위한 공통 인터페이스
 - **AbstractModuleService**: 공통 검증, 트랜잭션, 에러 처리 로직
 - **ModuleServiceFactory**: ServiceId 기반 자동 서비스 발견 및 라우팅
-- **CommonDAO**: 통합 데이터 접근 레이어 (MyBatis 호환)
+- **모듈별 @Mapper DAO**: MyBatis 인터페이스로 타입 안전한 데이터 접근
+- **모듈별 DTO 클래스**: C 구조체를 Java 객체로 변환
 - **CommonModuleController**: 단일 REST 엔드포인트 (`/api/module/{serviceId}`)
+- **H2 Database**: 인메모리 데이터베이스 + 자동 스키마/데이터 초기화
 
 ### 기존 유틸리티 모듈 (통합)
 - **StringUtil**: C의 `string.h` 함수들을 Java로 변환
@@ -647,4 +776,4 @@ docker run -p 8080:8080 wm-common
 
 **개발자**: Samsung WM Platform Team  
 **최종 업데이트**: 2025-09-01  
-**버전**: 2.0.0 (Factory Pattern - Clean Architecture)
+**버전**: 3.0.0 (MyBatis + Factory Pattern - Clean Architecture)
