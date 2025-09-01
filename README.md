@@ -177,78 +177,36 @@ POST /api/module/vm0001
 ## 🏗️ 프로젝트 구조
 
 ```
-src/main/java/com/samsung/wm/
-├── common/                    # 공통 인프라 (6개 파일)
-│   ├── dao/CommonDAO.java
-│   ├── factory/ModuleServiceFactory.java
-│   ├── response/CommonResponse.java
-│   └── service/
-│       ├── ModuleService.java
-│       └── AbstractModuleService.java
-├── controller/
-│   └── CommonModuleController.java    # 단일 REST 컨트롤러
-└── modules/                   # C 파일별 모듈 (1000개)
-    ├── vm0001/Vm0001Biz.java
-    ├── vm0002/Vm0002Biz.java
-    └── ...
-```
-
-### 기존 프로젝트 구조 (유틸리티 모듈)
-
-```
-wm-common-standalone/
-├── README.md
-├── build.gradle                    # Spring Boot 애플리케이션 설정
-├── .gitignore                     # Git 제외 파일 설정
-│
-├── src/main/java/com/samsung/
-│   ├── common/                    # 공통 유틸리티 (C → Java 변환)
-│   │   ├── calc/                  # 계산 유틸리티
-│   │   │   ├── FinancialCalculator.java    # 금융 계산 (복리, 대출 등)
-│   │   │   └── StatisticsCalculator.java   # 통계 계산 (평균, 표준편차 등)
-│   │   ├── constants/             # 상수 정의
-│   │   │   └── ErrorCodes.java              # 에러 코드 (C의 #define과 유사)
-│   │   ├── converter/             # 데이터 변환
-│   │   │   └── DataConverter.java           # 안전한 데이터 변환 (atoi, atof 등)
-│   │   ├── exception/             # 예외 처리
-│   │   │   └── BusinessException.java      # 비즈니스 예외
-│   │   └── util/                  # 유틸리티 클래스
-│   │       ├── StringUtil.java              # 문자열 처리 (string.h 유사)
-│   │       ├── DateUtil.java                # 날짜 처리 (time.h 유사)  
-│   │       └── ValidationUtil.java          # 검증 유틸리티
-│   │
-│   └── wm/                        # 재무 관리 도메인
-│       ├── WmCommonApplication.java         # Spring Boot 메인 클래스
-│       ├── controller/            # REST API
-│       │   └── WmCommonController.java      # 테스트용 API 컨트롤러
-│       ├── service/               # 비즈니스 서비스 
-│       │   ├── ConsultationService.java     # 상담 서비스
-│       │   ├── InvestmentPlanningService.java # 투자 계획 서비스
-│       │   └── PortfolioManagementService.java # 포트폴리오 관리 서비스
-│       ├── strategy/              # 전략 패턴 구현
-│       │   ├── consultation/      # 상담 전략
-│       │   │   ├── ConsultationStrategy.java      # 상담 전략 인터페이스
-│       │   │   ├── ConsultationResult.java        # 상담 결과
-│       │   │   └── impl/
-│       │   │       └── InitialConsultationStrategy.java # 초기 상담 전략
-│       │   ├── investment/        # 투자 전략
-│       │   │   ├── InvestmentStrategy.java         # 투자 전략 인터페이스
-│       │   │   ├── InvestmentRequest.java          # 투자 요청
-│       │   │   ├── InvestmentPlan.java             # 투자 계획
-│       │   │   └── impl/
-│       │   │       └── ConservativeInvestmentStrategy.java # 보수적 투자 전략
-│       │   └── portfolio/         # 포트폴리오 전략
-│       │       ├── PortfolioStrategy.java          # 포트폴리오 전략 인터페이스
-│       │       ├── PortfolioRequest.java           # 포트폴리오 요청
-│       │       └── impl/
-│       │           └── RebalancingStrategy.java    # 리밸런싱 전략
-│       ├── dto/                   # 데이터 전송 객체
-│       ├── integration/           # 외부 연동
-│       └── constants/             # 도메인 상수
-│
-└── src/main/resources/
-    └── application.yml            # 애플리케이션 설정
-```
+src/main/java/com/samsung/
+├── common/                    # 공통 인프라 + 유틸리티
+│   ├── calc/                  # 계산 유틸리티 (C → Java 변환)
+│   │   ├── FinancialCalculator.java
+│   │   └── StatisticsCalculator.java
+│   ├── constants/
+│   │   └── ErrorCodes.java
+│   ├── converter/
+│   │   └── DataConverter.java
+│   ├── dao/
+│   │   └── CommonDAO.java     # Factory 패턴용 공통 DAO
+│   ├── factory/
+│   │   └── ModuleServiceFactory.java  # 서비스 팩토리
+│   ├── response/
+│   │   └── CommonResponse.java        # 통합 응답 형식
+│   ├── service/
+│   │   ├── ModuleService.java         # 서비스 인터페이스
+│   │   └── AbstractModuleService.java # 공통 로직
+│   └── util/                  # 유틸리티 클래스
+│       ├── StringUtil.java
+│       ├── DateUtil.java
+│       └── ValidationUtil.java
+└── wm/                        # Factory 패턴 모듈
+    ├── WmCommonApplication.java       # Spring Boot 메인
+    ├── controller/
+    │   └── CommonModuleController.java # 단일 REST 컨트롤러
+    └── modules/               # C 파일별 모듈 (1000개)
+        ├── vm0001/Vm0001Biz.java
+        ├── vm0002/Vm0002Biz.java
+        └── ...
 
 ## 🚀 시작하기
 
@@ -665,20 +623,22 @@ docker run -p 8080:8080 wm-common
 5. **Push**: `git push origin feature/새기능명`
 6. **Pull Request** 생성
 
-## 기존 유틸리티 모듈
+## 통합된 아키텍처
 
-이 프로젝트는 기존의 C → Java 변환 유틸리티들도 포함하고 있습니다:
+이 프로젝트는 Factory 패턴과 기존 C → Java 변환 유틸리티를 통합한 구조입니다:
 
-### 공통 유틸리티 (C → Java 변환)
+### Factory 패턴 모듈 (신규)
+- **ModuleService**: 모든 C 파일 변환을 위한 공통 인터페이스
+- **AbstractModuleService**: 공통 검증, 트랜잭션, 에러 처리 로직
+- **ModuleServiceFactory**: ServiceId 기반 자동 서비스 발견 및 라우팅
+- **CommonDAO**: 통합 데이터 접근 레이어 (MyBatis 호환)
+- **CommonModuleController**: 단일 REST 엔드포인트 (`/api/module/{serviceId}`)
+
+### 기존 유틸리티 모듈 (통합)
 - **StringUtil**: C의 `string.h` 함수들을 Java로 변환
 - **DateUtil**: C의 `time.h` 함수들을 Java LocalDate/LocalDateTime으로 변환  
 - **FinancialCalculator**: 금융 계산 함수들 (복리, 대출상환 등)
 - **DataConverter**: C의 `atoi()`, `atof()` 등을 안전한 Java 변환 함수로
-
-### 전략 패턴 서비스
-- **상담 서비스**: 고객 상담 유형별 전략 (초기, 정기, 긴급 등)
-- **투자 계획**: 위험성향별 투자 전략 (보수적, 적극적 등)  
-- **포트폴리오 관리**: 리밸런싱, 최적화, 위험관리 전략
 
 ### 라이선스
 이 프로젝트는 MIT 라이선스 하에 배포됩니다.
@@ -687,4 +647,4 @@ docker run -p 8080:8080 wm-common
 
 **개발자**: Samsung WM Platform Team  
 **최종 업데이트**: 2025-09-01  
-**버전**: 2.0.0 (Factory Pattern)
+**버전**: 2.0.0 (Factory Pattern - Clean Architecture)

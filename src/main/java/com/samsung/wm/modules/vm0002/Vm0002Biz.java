@@ -1,7 +1,7 @@
 package com.samsung.wm.modules.vm0002;
 
-import com.samsung.wm.common.dao.CommonDAO;
-import com.samsung.wm.common.service.AbstractModuleService;
+import com.samsung.common.dao.CommonDAO;
+import com.samsung.common.service.AbstractModuleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

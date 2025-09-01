@@ -1,8 +1,8 @@
 package com.samsung.wm.controller;
 
-import com.samsung.wm.common.factory.ModuleServiceFactory;
-import com.samsung.wm.common.response.CommonResponse;
-import com.samsung.wm.common.service.ModuleService;
+import com.samsung.common.factory.ModuleServiceFactory;
+import com.samsung.common.response.CommonResponse;
+import com.samsung.common.service.ModuleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

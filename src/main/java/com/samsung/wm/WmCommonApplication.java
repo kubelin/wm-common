@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
  * C 공통 함수를 Java로 변환한 유틸리티 모듈과 전략 패턴 기반 서비스를 제공하는 Spring Boot 애플리케이션
  */
 @Slf4j
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = {"com.samsung.wm", "com.samsung.common"})
 public class WmCommonApplication {
 
     public static void main(String[] args) {
