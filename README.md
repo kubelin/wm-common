@@ -1,48 +1,199 @@
-# WM-Common - Wealth Management Common Module
+# 대규모 C 파일 → Java 변환 시스템
 
-**독립 실행 가능한 Spring Boot 애플리케이션**  
-C 공통 함수들을 Java로 변환한 유틸리티 모듈과 전략 패턴 기반 재무 관리 서비스를 제공합니다.
+**Factory + ServiceId 주입 패턴으로 1000개 이상 C 파일을 효율적으로 Java로 변환**  
+독립 실행 가능한 Spring Boot 애플리케이션으로 제공됩니다.
 
 ## 📋 목차
 
-- [프로젝트 개요](#프로젝트-개요)
-- [주요 특징](#주요-특징)
-- [프로젝트 구조](#프로젝트-구조)
-- [시작하기](#시작하기)
-- [API 사용법](#api-사용법)
-- [핵심 모듈](#핵심-모듈)
-- [서비스 아키텍처](#서비스-아키텍처)
+- [🚀 핵심 아키텍처](#-핵심-아키텍처)
+- [📋 구현 가이드](#-구현-가이드)
+- [🔧 개발 절차](#-개발-절차)
+- [🏗️ 프로젝트 구조](#️-프로젝트-구조)
+- [🚀 시작하기](#-시작하기)
+- [📚 API 사용법](#-api-사용법)
+- [기존 유틸리티 모듈](#기존-유틸리티-모듈)
 - [개발 가이드](#개발-가이드)
 
-## 🎯 프로젝트 개요
+## 🚀 핵심 아키텍처
 
-WM-Common은 C 언어의 공통 함수들을 Java로 마이그레이션하면서 현대적인 Spring Boot 패턴을 적용한 재무 관리(Wealth Management) 도메인 공통 모듈입니다.
+### Factory + ServiceId 패턴의 장점
+- **파일 수 최소화**: 3000개 파일(1:3 비율) → 약 2007개 파일로 감소
+- **공통 로직 통합**: 중복 코드를 AbstractModuleService로 추상화
+- **단일 진입점**: 모든 모듈을 하나의 REST Controller로 처리
+- **자동 서비스 등록**: Spring의 Component Scan으로 서비스 자동 발견
 
-### 설계 철학
-- **C → Java 변환**: 절차지향 → 객체지향 패턴 적용
-- **단순화된 전략 패턴**: Factory 없는 직접 주입 방식
-- **공통 유틸리티**: 정적 메소드 기반 유틸리티 클래스
-- **실용적 접근**: 복잡성보다 실용성과 유지보수성 우선
+### 변환 매핑 규칙
+```
+vm0001.c + vm0001.h  →  Vm0001Biz.java (비즈니스 로직)
+vm0002.c + vm0002.h  →  Vm0002Biz.java (비즈니스 로직)
+...
+vm9999.c + vm9999.h  →  Vm9999Biz.java (비즈니스 로직)
 
-## ✨ 주요 특징
++ 공통 인프라 6개 파일:
+  - ModuleService.java (인터페이스)
+  - AbstractModuleService.java (공통 로직)
+  - ModuleServiceFactory.java (팩토리)
+  - CommonModuleController.java (REST API)
+  - CommonDAO.java (데이터 접근)
+  - CommonResponse.java (응답 형식)
+```
 
-### 📦 C → Java 마이그레이션 패턴
-- **StringUtil**: C의 `string.h` 함수들을 Java로 변환
-- **DateUtil**: C의 `time.h` 함수들을 Java LocalDate/LocalDateTime으로 변환  
-- **FinancialCalculator**: 금융 계산 함수들 (복리, 대출상환 등)
-- **DataConverter**: C의 `atoi()`, `atof()` 등을 안전한 Java 변환 함수로
+## 📋 구현 가이드
 
-### 🎯 전략 패턴 서비스
-- **상담 서비스**: 고객 상담 유형별 전략 (초기, 정기, 긴급 등)
-- **투자 계획**: 위험성향별 투자 전략 (보수적, 적극적 등)  
-- **포트폴리오 관리**: 리밸런싱, 최적화, 위험관리 전략
+### 1. 각 C 파일별 Biz 클래스 생성
+```java
+@Service
+public class Vm0001Biz extends AbstractModuleService {
+    
+    public Vm0001Biz(CommonDAO dao) {
+        super(dao);
+    }
+    
+    @Override
+    public String getServiceId() {
+        return "vm0001";  // C 파일명과 매칭
+    }
+    
+    @Override
+    protected void validateInput(Map<String, Object> input) {
+        // C 파일의 입력 검증 로직을 Java로 변환
+        requireField(input, "customerId");
+        requireLength(input, "customerId", 7);
+    }
+    
+    @Override
+    protected Object executeBusinessLogic(Map<String, Object> input) {
+        // C 파일의 main 함수 로직을 Java로 변환
+        String customerId = (String) input.get("customerId");
+        
+        // C의 함수들을 순서대로 변환:
+        // 1. check_customer_exists() → dao.selectOne()
+        // 2. select_customer_info() → dao.selectOne() 
+        // 3. insert_access_log() → dao.insert()
+        // 4. update_last_access() → dao.update()
+        
+        return result;
+    }
+}
+```
 
-### 🚀 독립 실행
-- Spring Boot 3.2.1 기반 독립 실행 가능
-- RESTful API 제공으로 테스트 및 통합 용이
-- Docker 컨테이너화 지원
+### 2. C 함수 → Java 메소드 변환 패턴
+```c
+// C 파일 예시 (vm0001.c)
+int check_customer_exists(char* customer_id) {
+    // SQL 실행
+    return result;
+}
 
-## 📁 프로젝트 구조
+int select_customer_info(char* customer_id, customer_info_t* info) {
+    // 고객 정보 조회
+    return 0;
+}
+
+void insert_access_log(char* customer_id) {
+    // 접근 로그 기록
+}
+```
+
+```java
+// Java 변환 (Vm0001Biz.java)
+@Override
+protected Object executeBusinessLogic(Map<String, Object> input) {
+    String customerId = (String) input.get("customerId");
+    
+    // check_customer_exists → dao.selectOne
+    Map<String, Object> customer = dao.selectOne(
+        "vm0001.checkCustomer",
+        Map.of("customerId", customerId),
+        Map.class
+    );
+    
+    if (customer == null) {
+        return Map.of("resultCode", "404", "message", "고객을 찾을 수 없습니다");
+    }
+    
+    // select_customer_info → dao.selectOne  
+    Map<String, Object> customerInfo = dao.selectOne(
+        "vm0001.selectCustomer",
+        Map.of("customerId", customerId),
+        Map.class
+    );
+    
+    // insert_access_log → dao.insert
+    dao.insert("vm0001.insertAccessLog", Map.of(
+        "customerId", customerId,
+        "accessTime", LocalDateTime.now()
+    ));
+    
+    return Map.of(
+        "resultCode", "200",
+        "customerInfo", customerInfo
+    );
+}
+```
+
+### 3. REST API 사용법
+```bash
+# 모든 등록된 서비스 조회
+GET /api/module/services
+
+# 특정 서비스 존재 확인  
+GET /api/module/vm0001/exists
+
+# 서비스 실행 (C 파일의 main 함수 호출과 동일)
+POST /api/module/vm0001
+{
+  "customerId": "CUST001"
+}
+
+# 응답
+{
+  "success": true,
+  "code": "0000", 
+  "message": "vm0001 처리 완료",
+  "data": {
+    "resultCode": "200",
+    "customerInfo": { ... }
+  }
+}
+```
+
+## 🔧 개발 절차
+
+### 단계별 변환 프로세스
+1. **C 파일 분석**: 함수 목록, 입력/출력, 에러 처리 패턴 파악
+2. **ServiceId 결정**: C 파일명을 기반으로 고유 ID 생성 (vm0001)
+3. **입력 검증 구현**: validateInput() 메소드에 C의 입력 체크 로직 변환
+4. **비즈니스 로직 변환**: executeBusinessLogic()에 C 함수들을 순서대로 변환
+5. **DAO 쿼리 매핑**: C의 SQL을 MyBatis XML로 변환
+6. **테스트**: REST API로 기능 검증
+
+### 변환 우선순위
+1. **핵심 업무 모듈** (고객 조회, 계좌 관리 등)
+2. **공통 유틸리티 모듈** (검증, 계산, 변환)
+3. **배치 처리 모듈** (정산, 집계 등)
+4. **리포트 모듈** (조회, 통계)
+
+## 🏗️ 프로젝트 구조
+
+```
+src/main/java/com/samsung/wm/
+├── common/                    # 공통 인프라 (6개 파일)
+│   ├── dao/CommonDAO.java
+│   ├── factory/ModuleServiceFactory.java
+│   ├── response/CommonResponse.java
+│   └── service/
+│       ├── ModuleService.java
+│       └── AbstractModuleService.java
+├── controller/
+│   └── CommonModuleController.java    # 단일 REST 컨트롤러
+└── modules/                   # C 파일별 모듈 (1000개)
+    ├── vm0001/Vm0001Biz.java
+    ├── vm0002/Vm0002Biz.java
+    └── ...
+```
+
+### 기존 프로젝트 구조 (유틸리티 모듈)
 
 ```
 wm-common-standalone/
@@ -514,11 +665,26 @@ docker run -p 8080:8080 wm-common
 5. **Push**: `git push origin feature/새기능명`
 6. **Pull Request** 생성
 
+## 기존 유틸리티 모듈
+
+이 프로젝트는 기존의 C → Java 변환 유틸리티들도 포함하고 있습니다:
+
+### 공통 유틸리티 (C → Java 변환)
+- **StringUtil**: C의 `string.h` 함수들을 Java로 변환
+- **DateUtil**: C의 `time.h` 함수들을 Java LocalDate/LocalDateTime으로 변환  
+- **FinancialCalculator**: 금융 계산 함수들 (복리, 대출상환 등)
+- **DataConverter**: C의 `atoi()`, `atof()` 등을 안전한 Java 변환 함수로
+
+### 전략 패턴 서비스
+- **상담 서비스**: 고객 상담 유형별 전략 (초기, 정기, 긴급 등)
+- **투자 계획**: 위험성향별 투자 전략 (보수적, 적극적 등)  
+- **포트폴리오 관리**: 리밸런싱, 최적화, 위험관리 전략
+
 ### 라이선스
 이 프로젝트는 MIT 라이선스 하에 배포됩니다.
 
 ---
 
 **개발자**: Samsung WM Platform Team  
-**최종 업데이트**: 2025-08-31  
-**버전**: 1.0.0
+**최종 업데이트**: 2025-09-01  
+**버전**: 2.0.0 (Factory Pattern)
