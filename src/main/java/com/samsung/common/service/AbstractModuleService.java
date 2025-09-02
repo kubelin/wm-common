@@ -49,6 +49,38 @@ public abstract class AbstractModuleService implements ModuleService {
         }
     }
     
+    @Override
+    @Transactional
+    public <T> T process(Map<String, Object> input, Class<T> outputClass) {
+        String serviceId = getServiceId();
+        log.info("[{}] 타입 안전 모듈 처리 시작 - input: {}, outputClass: {}", serviceId, input, outputClass.getSimpleName());
+        
+        try {
+            // 1. 공통 입력 검증
+            validateCommonInput(input);
+            
+            // 2. 개별 검증 (각 구현체에서 정의)
+            validateInput(input);
+            
+            // 3. 비즈니스 로직 실행 (각 구현체에서 정의)
+            Object result = executeBusinessLogic(input);
+            
+            // 4. 결과를 요청된 타입으로 변환
+            T typedResult = objectMapper.convertValue(result, outputClass);
+            
+            log.info("[{}] 타입 안전 모듈 처리 완료 - result: {}", serviceId, typedResult);
+            return typedResult;
+            
+        } catch (IllegalArgumentException e) {
+            log.error("[{}] 입력 검증 오류: {}", serviceId, e.getMessage());
+            throw e;
+            
+        } catch (Exception e) {
+            log.error("[{}] 처리 중 오류 발생", serviceId, e);
+            throw new RuntimeException(serviceId + " 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
+    
     /**
      * 공통 입력 검증
      */

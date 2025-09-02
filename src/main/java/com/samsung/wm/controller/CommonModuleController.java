@@ -139,12 +139,13 @@ public class CommonModuleController {
         log.info("VM0001 DTO 처리 요청 - input: {}", inputDto);
         
         try {
-            @SuppressWarnings("unchecked")
-            TypedModuleService<Vm0001InputDto, Vm0001OutputDto> service = 
-                (TypedModuleService<Vm0001InputDto, Vm0001OutputDto>) factory.getService("vm0001");
+            ModuleService service = factory.getService("vm0001");
             
-            // 서비스에서 직접 DTO를 받아옴
-            Vm0001OutputDto result = service.processTyped(inputDto);
+            // Map으로 변환해서 generic process 호출
+            Map<String, Object> inputMap = convertToMap(inputDto);
+            
+            // 서비스에서 타입 안전하게 DTO를 받아옴
+            Vm0001OutputDto result = service.process(inputMap, Vm0001OutputDto.class);
             
             // 컨트롤러에서 CommonResponse로 래핑
             CommonResponse<Vm0001OutputDto> response = CommonResponse.success(result, "VM0001 처리 완료");
@@ -161,6 +162,20 @@ public class CommonModuleController {
     }
     
     /**
+     * DTO를 Map으로 변환하는 유틸리티 메소드
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> convertToMap(Object dto) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.convertValue(dto, Map.class);
+        } catch (Exception e) {
+            log.error("DTO -> Map 변환 중 오류 발생: {}", e.getMessage());
+            throw new IllegalArgumentException("입력 데이터 변환에 실패했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
      * VM0002 계좌잔고 조회 서비스 (타입 안전한 DTO)
      */
     @PostMapping("/vm0002/dto")
@@ -170,12 +185,13 @@ public class CommonModuleController {
         log.info("VM0002 DTO 처리 요청 - input: {}", inputDto);
         
         try {
-            @SuppressWarnings("unchecked")
-            TypedModuleService<Vm0002InputDto, Vm0002OutputDto> service = 
-                (TypedModuleService<Vm0002InputDto, Vm0002OutputDto>) factory.getService("vm0002");
+            ModuleService service = factory.getService("vm0002");
             
-            // 서비스에서 직접 DTO를 받아옴
-            Vm0002OutputDto result = service.processTyped(inputDto);
+            // Map으로 변환해서 generic process 호출
+            Map<String, Object> inputMap = convertToMap(inputDto);
+            
+            // 서비스에서 타입 안전하게 DTO를 받아옴
+            Vm0002OutputDto result = service.process(inputMap, Vm0002OutputDto.class);
             
             // 컨트롤러에서 CommonResponse로 래핑
             CommonResponse<Vm0002OutputDto> response = CommonResponse.success(result, "VM0002 처리 완료");

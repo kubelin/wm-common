@@ -27,7 +27,7 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
     @Transactional
     public CommonResponse<?> process(Map<String, Object> input) {
         String serviceId = getServiceId();
-        log.info("[{}] DTO 모듈 처리 시작 - input: {}", serviceId, input);
+        log.info("[{}] DTO 모듈 처리 시작 (HTTP용) - input: {}", serviceId, input);
         
         try {
             // 1. Map을 Input DTO로 변환
@@ -39,7 +39,7 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
             // 3. 타입 안전한 비즈니스 로직 실행
             O result = processTyped(inputDto);
             
-            log.info("[{}] DTO 모듈 처리 완료 - result: {}", serviceId, result);
+            log.info("[{}] DTO 모듈 처리 완료 (HTTP용) - result: {}", serviceId, result);
             return CommonResponse.success(result, serviceId + " 처리 완료");
             
         } catch (IllegalArgumentException e) {
@@ -50,6 +50,44 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
             log.error("[{}] 처리 중 오류 발생", serviceId, e);
             return CommonResponse.error(ErrorCodes.UNKNOWN_ERROR, 
                                       serviceId + " 처리 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public <T> T process(Map<String, Object> input, Class<T> outputClass) {
+        String serviceId = getServiceId();
+        log.info("[{}] 타입 안전 DTO 모듈 처리 시작 (BIZ용) - input: {}, outputClass: {}", 
+                serviceId, input, outputClass.getSimpleName());
+        
+        try {
+            // 1. Map을 Input DTO로 변환
+            I inputDto = convertToDto(input, getInputDtoClass());
+            
+            // 2. DTO 검증 (Jakarta Validation)
+            validateDto(inputDto);
+            
+            // 3. 타입 안전한 비즈니스 로직 실행
+            O result = processTyped(inputDto);
+            
+            // 4. Output DTO가 요청된 타입과 일치하는지 확인하고 변환
+            if (outputClass.isInstance(result)) {
+                T typedResult = (T) result;
+                log.info("[{}] 타입 안전 DTO 모듈 처리 완료 (BIZ용) - result: {}", serviceId, typedResult);
+                return typedResult;
+            } else {
+                throw new IllegalArgumentException("출력 타입이 일치하지 않습니다. 요청: " + outputClass.getSimpleName() + 
+                                                 ", 실제: " + result.getClass().getSimpleName());
+            }
+            
+        } catch (IllegalArgumentException e) {
+            log.error("[{}] 입력 검증 오류: {}", serviceId, e.getMessage());
+            throw e;
+            
+        } catch (Exception e) {
+            log.error("[{}] 처리 중 오류 발생", serviceId, e);
+            throw new RuntimeException(serviceId + " 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
     
