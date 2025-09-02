@@ -1,27 +1,26 @@
 package com.samsung.wm.modules.vm0001;
 
-import com.samsung.common.service.AbstractModuleService;
+import com.samsung.common.service.AbstractTypedModuleService;
+import com.samsung.common.response.CommonResponse;
 import com.samsung.wm.modules.vm0001.dao.Vm0001Dao;
-import com.samsung.wm.modules.vm0001.dto.AccessLogDto;
-import com.samsung.wm.modules.vm0001.dto.CustomerDto;
+import com.samsung.wm.modules.vm0001.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * VM0001 모듈 서비스 (고객정보 조회)
  * 
  * C 파일: vm0001.c, vm0001.h
  * 기능: 고객 정보 조회 및 접근 로그 기록
+ * Factory Pattern + Input/Output DTO 지원
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class Vm0001Biz extends AbstractModuleService {
+public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001OutputDto> {
     
     private final Vm0001Dao vm0001Dao;
     
@@ -36,15 +35,18 @@ public class Vm0001Biz extends AbstractModuleService {
     }
     
     @Override
-    protected void validateInput(Map<String, Object> input) {
-        // 고객 ID는 필수이며 10자리 숫자
-        requireField(input, "customerId");
-        requireLength(input, "customerId", 7); // CUST001 형태
+    public Class<Vm0001InputDto> getInputDtoClass() {
+        return Vm0001InputDto.class;
     }
     
     @Override
-    protected Object executeBusinessLogic(Map<String, Object> input) {
-        String customerId = (String) input.get("customerId");
+    public Class<Vm0001OutputDto> getOutputDtoClass() {
+        return Vm0001OutputDto.class;
+    }
+    
+    @Override
+    public CommonResponse<Vm0001OutputDto> processTyped(Vm0001InputDto inputDto) {
+        String customerId = inputDto.getCustomerId();
         log.info("[vm0001] 고객정보 조회 시작 - customerId: {}", customerId);
         
         try {
@@ -53,11 +55,12 @@ public class Vm0001Biz extends AbstractModuleService {
             
             if (customer == null) {
                 log.warn("[vm0001] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
-                Map<String, Object> notFoundResult = new HashMap<>();
-                notFoundResult.put("resultCode", "404");
-                notFoundResult.put("message", "고객을 찾을 수 없습니다");
-                notFoundResult.put("customerId", customerId);
-                return notFoundResult;
+                Vm0001OutputDto notFoundResult = Vm0001OutputDto.builder()
+                    .resultCode("404")
+                    .message("고객을 찾을 수 없습니다")
+                    .accessTime(LocalDateTime.now())
+                    .build();
+                return CommonResponse.success(notFoundResult, "고객을 찾을 수 없습니다");
             }
             
             // 2. 접근 로그 기록 (vm0001.c의 insert_access_log 함수 역할)
@@ -71,23 +74,25 @@ public class Vm0001Biz extends AbstractModuleService {
             // 3. 고객 상태 업데이트 (vm0001.c의 update_last_access 함수 역할)
             vm0001Dao.updateLastAccess(customerId, LocalDateTime.now());
             
-            // 4. 결과 반환
-            Map<String, Object> result = new HashMap<>();
-            result.put("resultCode", "200");
-            result.put("message", "고객정보 조회 성공");
-            result.put("customerInfo", customer);
-            result.put("accessTime", LocalDateTime.now());
+            // 4. 결과 반환 (타입 안전한 DTO)
+            Vm0001OutputDto result = Vm0001OutputDto.builder()
+                .resultCode("200")
+                .message("고객정보 조회 성공")
+                .customerInfo(customer)
+                .accessTime(LocalDateTime.now())
+                .build();
             
             log.info("[vm0001] 고객정보 조회 완료 - customerId: {}", customerId);
-            return result;
+            return CommonResponse.success(result, "고객정보 조회 성공");
             
         } catch (Exception e) {
             log.error("[vm0001] 고객정보 조회 중 오류 발생", e);
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("resultCode", "500");
-            errorResult.put("message", "고객정보 조회 중 오류가 발생했습니다");
-            errorResult.put("error", e.getMessage());
-            return errorResult;
+            Vm0001OutputDto errorResult = Vm0001OutputDto.builder()
+                .resultCode("500")
+                .message("고객정보 조회 중 오류가 발생했습니다: " + e.getMessage())
+                .accessTime(LocalDateTime.now())
+                .build();
+            return CommonResponse.success(errorResult, "처리 중 오류 발생");
         }
     }
 }

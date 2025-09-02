@@ -1,26 +1,31 @@
-# 대규모 C 파일 → Java 변환 시스템
+# 대규모 C → Java 변환 시스템 (Factory + DTO Pattern)
 
-**Factory + ServiceId 주입 패턴으로 1000개 이상 C 파일을 효율적으로 Java로 변환**  
+**🏭 Factory Pattern + Input/Output DTO로 1000개 이상 C 파일을 타입 안전하게 Java로 변환**  
 독립 실행 가능한 Spring Boot 애플리케이션으로 제공됩니다.
 
 ## 📋 목차
 
 - [🚀 핵심 아키텍처](#-핵심-아키텍처)
-- [📋 구현 가이드](#-구현-가이드)
+- [🏗️ 클래스 다이어그램](#️-클래스-다이어그램)
+- [📋 Factory + DTO 패턴 구현 가이드](#-factory--dto-패턴-구현-가이드)
 - [🔧 개발 절차](#-개발-절차)
 - [🏗️ 프로젝트 구조](#️-프로젝트-구조)
 - [🚀 시작하기](#-시작하기)
 - [📚 API 사용법](#-api-사용법)
+- [📊 샘플 코드](#-샘플-코드)
 - [기존 유틸리티 모듈](#기존-유틸리티-모듈)
 - [개발 가이드](#개발-가이드)
 
 ## 🚀 핵심 아키텍처
 
-### Factory + ServiceId 패턴의 장점
-- **파일 수 최소화**: 3000개 파일(1:3 비율) → 약 2007개 파일로 감소
-- **공통 로직 통합**: 중복 코드를 AbstractModuleService로 추상화
-- **단일 진입점**: 모든 모듈을 하나의 REST Controller로 처리
-- **자동 서비스 등록**: Spring의 Component Scan으로 서비스 자동 발견
+### Factory + Input/Output DTO 패턴의 장점
+- **🏭 타입 안전성**: Input/Output DTO로 컴파일 타임 타입 검사
+- **📝 자동 검증**: Jakarta Validation으로 입력 데이터 자동 검증
+- **🔄 양방향 호환**: Map 기반과 DTO 기반 API 동시 지원
+- **📊 명확한 인터페이스**: 각 모듈별 명시적인 입출력 스키마
+- **🎯 단일 진입점**: 모든 모듈을 하나의 REST Controller로 처리
+- **🚀 자동 서비스 등록**: Spring의 Component Scan으로 서비스 자동 발견
+- **♻️ 공통 로직 통합**: 중복 코드를 Abstract 클래스로 추상화
 
 ### 변환 매핑 규칙
 ```
@@ -39,7 +44,152 @@ vm9999.c + vm9999.h  →  Vm9999Biz.java (비즈니스 로직)
   - CommonResponse.java (응답 형식)
 ```
 
-## 📋 구현 가이드
+## 🏗️ 클래스 다이어그램
+
+### Factory Pattern + DTO 아키텍처
+
+```mermaid
+classDiagram
+    class ModuleService {
+        <<interface>>
+        +getServiceId() String
+        +process(Map) CommonResponse
+        +getDescription() String
+    }
+    
+    class TypedModuleService {
+        <<interface>>
+        +processTyped(I) CommonResponse~O~
+        +getInputDtoClass() Class~I~
+        +getOutputDtoClass() Class~O~
+    }
+    
+    class AbstractModuleService {
+        <<abstract>>
+        +process(Map) CommonResponse
+        #validateInput(Map) void
+        #executeBusinessLogic(Map) Object
+        #convertToDto(Map, Class) T
+        #convertToMap(Object) Map
+    }
+    
+    class AbstractTypedModuleService {
+        <<abstract>>
+        +process(Map) CommonResponse
+        +processTyped(I) CommonResponse~O~
+        #validateDto(I) void
+    }
+    
+    class Vm0001Biz {
+        +getServiceId() String
+        +processTyped(Vm0001InputDto) CommonResponse~Vm0001OutputDto~
+        +getInputDtoClass() Class
+        +getOutputDtoClass() Class
+    }
+    
+    class Vm0002Biz {
+        +getServiceId() String
+        +processTyped(Vm0002InputDto) CommonResponse~Vm0002OutputDto~
+        +getInputDtoClass() Class
+        +getOutputDtoClass() Class
+    }
+    
+    class ModuleServiceFactory {
+        -services Map~String, ModuleService~
+        +getService(String) ModuleService
+        +getAllServices() Map
+        +hasService(String) boolean
+    }
+    
+    class CommonModuleController {
+        -factory ModuleServiceFactory
+        +processModule(String, Map) ResponseEntity
+        +processVm0001Dto(Vm0001InputDto) ResponseEntity
+        +processVm0002Dto(Vm0002InputDto) ResponseEntity
+    }
+    
+    class Vm0001InputDto {
+        +customerId String
+    }
+    
+    class Vm0001OutputDto {
+        +resultCode String
+        +message String
+        +customerInfo CustomerDto
+        +accessTime LocalDateTime
+    }
+    
+    class Vm0002InputDto {
+        +customerId String
+        +accountType String
+    }
+    
+    class Vm0002OutputDto {
+        +resultCode String
+        +customerId String
+        +accountCount Integer
+        +totalBalance BigDecimal
+        +accounts List~AccountDto~
+    }
+    
+    ModuleService <|-- TypedModuleService
+    ModuleService <|.. AbstractModuleService
+    TypedModuleService <|.. AbstractTypedModuleService
+    AbstractModuleService <|-- AbstractTypedModuleService
+    AbstractTypedModuleService <|-- Vm0001Biz
+    AbstractTypedModuleService <|-- Vm0002Biz
+    
+    ModuleServiceFactory *-- ModuleService
+    CommonModuleController --> ModuleServiceFactory
+    CommonModuleController ..> Vm0001InputDto
+    CommonModuleController ..> Vm0001OutputDto
+    CommonModuleController ..> Vm0002InputDto
+    CommonModuleController ..> Vm0002OutputDto
+    
+    Vm0001Biz ..> Vm0001InputDto
+    Vm0001Biz ..> Vm0001OutputDto
+    Vm0002Biz ..> Vm0002InputDto
+    Vm0002Biz ..> Vm0002OutputDto
+```
+
+### 요청 처리 플로우
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Controller as CommonModuleController
+    participant Factory as ModuleServiceFactory
+    participant Service as Vm0001Biz
+    participant DAO as Vm0001Dao
+    participant DB as Database
+    
+    Client->>Controller: POST /api/module/vm0001/dto
+    Note over Client,Controller: Vm0001InputDto
+    
+    Controller->>Factory: getService("vm0001")
+    Factory->>Controller: return Vm0001Biz
+    
+    Controller->>Service: processTyped(inputDto)
+    
+    Service->>Service: validateDto(inputDto)
+    Note over Service: Jakarta Validation
+    
+    Service->>DAO: selectCustomer(customerId)
+    DAO->>DB: SQL Query
+    DB->>DAO: CustomerDto
+    DAO->>Service: CustomerDto
+    
+    Service->>DAO: insertAccessLog(logDto)
+    DAO->>DB: INSERT
+    
+    Service->>Service: build Vm0001OutputDto
+    Service->>Controller: CommonResponse<Vm0001OutputDto>
+    
+    Controller->>Client: ResponseEntity<CommonResponse<Vm0001OutputDto>>
+    Note over Controller,Client: Type-safe response
+```
+
+## 📋 Factory + DTO 패턴 구현 가이드
 
 ### 1. MyBatis 아키텍처 구조
 
@@ -219,47 +369,117 @@ src/main/java/com/samsung/
         └── ...                        # 1000개 모듈
 ```
 
-### 4. REST API 사용법
+### 4. 새로운 타입 안전한 DTO 기반 API
+
+#### A. Input/Output DTO 정의
+```java
+// VM0001 Input DTO
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class Vm0001InputDto {
+    @NotBlank(message = "고객ID는 필수입니다")
+    @Size(min = 7, max = 7, message = "고객ID는 7자리여야 합니다")
+    private String customerId;
+}
+
+// VM0001 Output DTO  
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class Vm0001OutputDto {
+    private String resultCode;
+    private String message;
+    private CustomerDto customerInfo;
+    private LocalDateTime accessTime;
+}
+```
+
+#### B. TypedModuleService 구현
+```java
+@Service
+@RequiredArgsConstructor
+public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001OutputDto> {
+    
+    private final Vm0001Dao vm0001Dao;
+    
+    @Override
+    public String getServiceId() { return "vm0001"; }
+    
+    @Override
+    public Class<Vm0001InputDto> getInputDtoClass() { return Vm0001InputDto.class; }
+    
+    @Override
+    public Class<Vm0001OutputDto> getOutputDtoClass() { return Vm0001OutputDto.class; }
+    
+    @Override
+    public CommonResponse<Vm0001OutputDto> processTyped(Vm0001InputDto inputDto) {
+        // 타입 안전한 비즈니스 로직 구현
+        CustomerDto customer = vm0001Dao.selectCustomer(inputDto.getCustomerId());
+        
+        Vm0001OutputDto result = Vm0001OutputDto.builder()
+            .resultCode("200")
+            .message("고객정보 조회 성공")
+            .customerInfo(customer)
+            .accessTime(LocalDateTime.now())
+            .build();
+            
+        return CommonResponse.success(result, "고객정보 조회 성공");
+    }
+}
+```
+
+### 5. REST API 사용법
+
+#### A. 기존 Map 기반 API (하위 호환)
 ```bash
 # 모든 등록된 서비스 조회
 GET /api/module/services
 
-# vm0001 고객정보 조회 서비스 실행
+# vm0001 고객정보 조회 서비스 실행 (Map 기반)
 POST /api/module/vm0001
 {
   "customerId": "CUST001"
 }
+```
 
-# 응답 예시
+#### B. 새로운 DTO 기반 API (권장)
+```bash
+# VM0001 고객정보 조회 (타입 안전한 DTO)
+POST /api/module/vm0001/dto
+{
+  "customerId": "CUST001"
+}
+
+# 응답 예시 (타입 안전)
 {
   "success": true,
   "code": "0000", 
-  "message": "vm0001 처리 완료",
+  "message": "고객정보 조회 성공",
   "data": {
     "resultCode": "200",
+    "message": "고객정보 조회 성공",
     "customerInfo": {
       "customerId": "CUST001",
       "customerName": "홍길동",
       "status": "ACTIVE",
       "createTime": "2025-01-01"
     },
-    "message": "고객정보 조회 성공"
+    "accessTime": "2025-09-02T10:30:45"
   }
 }
 
-# vm0002 계좌잔고 조회 서비스 실행  
-POST /api/module/vm0002
+# VM0002 계좌잔고 조회 (타입 안전한 DTO)  
+POST /api/module/vm0002/dto
 {
-  "customerId": "CUST001"
+  "customerId": "CUST001",
+  "accountType": "SAVINGS"
 }
 
-# 응답 예시
+# 응답 예시 (타입 안전)
 {
   "success": true,
   "code": "0000",
-  "message": "vm0002 처리 완료", 
+  "message": "계좌잔고 조회 성공", 
   "data": {
     "resultCode": "200",
+    "message": "계좌잔고 조회 성공",
     "customerId": "CUST001",
     "accountCount": 2,
     "totalBalance": 1500000.00,
@@ -267,16 +487,155 @@ POST /api/module/vm0002
       {
         "accountNo": "1001-001-001",
         "accountType": "SAVINGS", 
-        "balance": 1000000.00
+        "balance": 1000000.00,
+        "interestRate": 2.5,
+        "lastTransactionTime": "2025-09-01T10:30:45"
       }
-    ]
+    ],
+    "inquiryTime": "2025-09-02T10:30:45"
   }
 }
 ```
 
+## 📊 샘플 코드
+
+### VM0003 새 모듈 추가 예시
+
+#### 1. Input/Output DTO 정의
+```java
+// VM0003 입금 처리 Input DTO
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class Vm0003InputDto {
+    @NotBlank(message = "계좌번호는 필수입니다")
+    @Size(min = 12, max = 12, message = "계좌번호는 12자리여야 합니다")
+    private String accountNo;
+    
+    @NotNull(message = "입금액은 필수입니다")
+    @DecimalMin(value = "1000", message = "최소 입금액은 1,000원입니다")
+    private BigDecimal amount;
+    
+    @Size(max = 100, message = "입금 메모는 100자 이하여야 합니다")
+    private String memo;
+}
+
+// VM0003 입금 처리 Output DTO
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class Vm0003OutputDto {
+    private String resultCode;
+    private String message;
+    private String accountNo;
+    private BigDecimal beforeBalance;
+    private BigDecimal afterBalance;
+    private String transactionId;
+    private LocalDateTime processTime;
+}
+```
+
+#### 2. 비즈니스 로직 구현
+```java
+@Service
+@RequiredArgsConstructor
+public class Vm0003Biz extends AbstractTypedModuleService<Vm0003InputDto, Vm0003OutputDto> {
+    
+    private final Vm0003Dao vm0003Dao;
+    
+    @Override
+    public String getServiceId() { return "vm0003"; }
+    
+    @Override
+    public Class<Vm0003InputDto> getInputDtoClass() { return Vm0003InputDto.class; }
+    
+    @Override
+    public Class<Vm0003OutputDto> getOutputDtoClass() { return Vm0003OutputDto.class; }
+    
+    @Override
+    public CommonResponse<Vm0003OutputDto> processTyped(Vm0003InputDto inputDto) {
+        // 타입 안전한 비즈니스 로직 구현
+        AccountDto account = vm0003Dao.selectAccount(inputDto.getAccountNo());
+        
+        // 잔고 업데이트 및 거래 로그 기록
+        BigDecimal beforeBalance = account.getBalance();
+        vm0003Dao.updateBalance(inputDto.getAccountNo(), inputDto.getAmount());
+        
+        Vm0003OutputDto result = Vm0003OutputDto.builder()
+            .resultCode("200")
+            .message("입금 처리 성공")
+            .accountNo(inputDto.getAccountNo())
+            .beforeBalance(beforeBalance)
+            .afterBalance(beforeBalance.add(inputDto.getAmount()))
+            .processTime(LocalDateTime.now())
+            .build();
+            
+        return CommonResponse.success(result, "입금 처리 성공");
+    }
+}
+```
+
+#### 3. API 호출 예시
+```bash
+# VM0003 입금 처리 (타입 안전한 DTO)
+POST /api/module/vm0003/dto
+{
+  "accountNo": "100100100001",
+  "amount": 50000,
+  "memo": "급여 입금"
+}
+
+# 응답 예시
+{
+  "success": true,
+  "code": "0000",
+  "message": "입금 처리 성공",
+  "data": {
+    "resultCode": "200",
+    "message": "입금 처리 성공",
+    "accountNo": "100100100001",
+    "beforeBalance": 1000000.00,
+    "afterBalance": 1050000.00,
+    "transactionId": "TXN20250902001",
+    "processTime": "2025-09-02T10:35:22"
+  }
+}
+```
+
+### Factory Pattern 장점 요약
+
+#### 🔄 양방향 호환성
+```java
+// 기존 Map 기반 API (하위 호환)
+POST /api/module/vm0003
+{ "accountNo": "100100100001", "amount": 50000 }
+
+// 새로운 DTO 기반 API (권장)  
+POST /api/module/vm0003/dto
+{ "accountNo": "100100100001", "amount": 50000, "memo": "급여 입금" }
+```
+
+#### 🎯 타입 안전성
+```java
+// 컴파일 타임 타입 체크
+Vm0003InputDto input = Vm0003InputDto.builder()
+    .accountNo("100100100001")
+    .amount(new BigDecimal("50000"))  // BigDecimal 강제
+    .memo("급여 입금")
+    .build();
+
+// Jakarta Validation 자동 적용
+@NotNull @DecimalMin("1000") BigDecimal amount;
+```
+
+#### 🚀 확장성
+```java
+// 새 모듈 추가 시 최소한의 코드
+1. InputDto + OutputDto 정의 (2개 클래스)
+2. Dao 인터페이스 정의 (1개 인터페이스)  
+3. Biz 클래스 구현 (1개 클래스)
+4. Controller에 엔드포인트 추가 (1개 메소드)
+```
+
 ## 🔧 개발 절차
 
-### MyBatis 아키텍처 기반 변환 프로세스
+### Factory + DTO 패턴 기반 변환 프로세스
 1. **C 파일 분석**: 함수 목록, 구조체 정의, SQL 패턴 파악
 2. **ServiceId 결정**: C 파일명을 기반으로 고유 ID 생성 (vm0001)
 3. **DTO 클래스 생성**: C 구조체를 Java DTO로 변환 (@Data, @Builder 사용)
@@ -775,5 +1134,5 @@ docker run -p 8080:8080 wm-common
 ---
 
 **개발자**: Samsung WM Platform Team  
-**최종 업데이트**: 2025-09-01  
-**버전**: 3.0.0 (MyBatis + Factory Pattern - Clean Architecture)
+**최종 업데이트**: 2025-09-02  
+**버전**: 4.0.0 (Factory Pattern + Input/Output DTO - Type-Safe Architecture)

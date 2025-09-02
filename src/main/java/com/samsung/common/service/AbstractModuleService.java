@@ -5,15 +5,19 @@ import com.samsung.common.util.StringUtil;
 import com.samsung.common.response.CommonResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
 /**
  * 추상 모듈 서비스 클래스
  * 모든 C 파일 변환 서비스의 공통 로직을 처리
+ * Input/Output DTO 패턴 지원
  */
 @Slf4j
 public abstract class AbstractModuleService implements ModuleService {
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Override
     @Transactional
@@ -105,6 +109,32 @@ public abstract class AbstractModuleService implements ModuleService {
             return true;
         } catch (NumberFormatException e) {
             return false;
+        }
+    }
+    
+    // === DTO 변환 유틸리티 메소드들 ===
+    
+    /**
+     * Map을 DTO로 변환
+     */
+    protected <T> T convertToDto(Map<String, Object> input, Class<T> dtoClass) {
+        try {
+            return objectMapper.convertValue(input, dtoClass);
+        } catch (Exception e) {
+            log.error("Map -> DTO 변환 중 오류 발생: {}", e.getMessage());
+            throw new IllegalArgumentException("입력 데이터 변환에 실패했습니다: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * DTO를 Map으로 변환
+     */
+    protected Map<String, Object> convertToMap(Object dto) {
+        try {
+            return objectMapper.convertValue(dto, Map.class);
+        } catch (Exception e) {
+            log.error("DTO -> Map 변환 중 오류 발생: {}", e.getMessage());
+            throw new IllegalArgumentException("출력 데이터 변환에 실패했습니다: " + e.getMessage());
         }
     }
 }

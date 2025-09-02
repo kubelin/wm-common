@@ -3,6 +3,9 @@ package com.samsung.wm.controller;
 import com.samsung.common.factory.ModuleServiceFactory;
 import com.samsung.common.response.CommonResponse;
 import com.samsung.common.service.ModuleService;
+import com.samsung.common.service.TypedModuleService;
+import com.samsung.wm.modules.vm0001.dto.*;
+import com.samsung.wm.modules.vm0002.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +16,7 @@ import java.util.Map;
 /**
  * 통합 모듈 컨트롤러
  * 모든 C 파일 변환 서비스를 단일 진입점으로 처리
+ * Factory Pattern + Input/Output DTO 완전 지원
  */
 @Slf4j
 @RestController
@@ -111,7 +115,8 @@ public class CommonModuleController {
         Map<String, Object> serviceInfo = Map.of(
             "serviceId", service.getServiceId(),
             "description", service.getDescription(),
-            "className", service.getClass().getSimpleName()
+            "className", service.getClass().getSimpleName(),
+            "supportsTypedDto", service instanceof TypedModuleService
         );
         
         CommonResponse<Map<String, Object>> response = CommonResponse.success(
@@ -120,5 +125,71 @@ public class CommonModuleController {
         );
         
         return ResponseEntity.ok(response);
+    }
+    
+    // === 타입 안전한 DTO 기반 엔드포인트들 ===
+    
+    /**
+     * VM0001 고객정보 조회 서비스 (타입 안전한 DTO)
+     */
+    @PostMapping("/vm0001/dto")
+    public ResponseEntity<CommonResponse<Vm0001OutputDto>> processVm0001Dto(
+            @RequestBody Vm0001InputDto inputDto) {
+        
+        log.info("VM0001 DTO 처리 요청 - input: {}", inputDto);
+        
+        try {
+            @SuppressWarnings("unchecked")
+            TypedModuleService<Vm0001InputDto, Vm0001OutputDto> service = 
+                (TypedModuleService<Vm0001InputDto, Vm0001OutputDto>) factory.getService("vm0001");
+            
+            CommonResponse<Vm0001OutputDto> response = service.processTyped(inputDto);
+            
+            if (response.isSuccess()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+        } catch (Exception e) {
+            log.error("VM0001 DTO 처리 중 예외 발생", e);
+            CommonResponse<Vm0001OutputDto> errorResponse = CommonResponse.error(
+                "CONTROLLER_ERROR", 
+                "VM0001 처리 중 오류가 발생했습니다: " + e.getMessage()
+            );
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+    
+    /**
+     * VM0002 계좌잔고 조회 서비스 (타입 안전한 DTO)
+     */
+    @PostMapping("/vm0002/dto")
+    public ResponseEntity<CommonResponse<Vm0002OutputDto>> processVm0002Dto(
+            @RequestBody Vm0002InputDto inputDto) {
+        
+        log.info("VM0002 DTO 처리 요청 - input: {}", inputDto);
+        
+        try {
+            @SuppressWarnings("unchecked")
+            TypedModuleService<Vm0002InputDto, Vm0002OutputDto> service = 
+                (TypedModuleService<Vm0002InputDto, Vm0002OutputDto>) factory.getService("vm0002");
+            
+            CommonResponse<Vm0002OutputDto> response = service.processTyped(inputDto);
+            
+            if (response.isSuccess()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+        } catch (Exception e) {
+            log.error("VM0002 DTO 처리 중 예외 발생", e);
+            CommonResponse<Vm0002OutputDto> errorResponse = CommonResponse.error(
+                "CONTROLLER_ERROR", 
+                "VM0002 처리 중 오류가 발생했습니다: " + e.getMessage()
+            );
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
     }
 }

@@ -1,30 +1,29 @@
 package com.samsung.wm.modules.vm0002;
 
-import com.samsung.common.service.AbstractModuleService;
+import com.samsung.common.service.AbstractTypedModuleService;
+import com.samsung.common.response.CommonResponse;
 import com.samsung.wm.modules.vm0001.dto.CustomerDto;
 import com.samsung.wm.modules.vm0002.dao.Vm0002Dao;
-import com.samsung.wm.modules.vm0002.dto.AccountDto;
-import com.samsung.wm.modules.vm0002.dto.InquiryLogDto;
+import com.samsung.wm.modules.vm0002.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * VM0002 모듈 서비스 (계좌잔고 조회)
  * 
  * C 파일: vm0002.c, vm0002.h  
  * 기능: 고객의 계좌 목록 및 잔고 조회
+ * Factory Pattern + Input/Output DTO 지원
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class Vm0002Biz extends AbstractModuleService {
+public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002OutputDto> {
     
     private final Vm0002Dao vm0002Dao;
     
@@ -39,24 +38,19 @@ public class Vm0002Biz extends AbstractModuleService {
     }
     
     @Override
-    protected void validateInput(Map<String, Object> input) {
-        // 고객 ID는 필수
-        requireField(input, "customerId");
-        requireLength(input, "customerId", 7); // CUST001 형태
-        
-        // 계좌 유형은 선택사항
-        if (input.containsKey("accountType")) {
-            String accountType = (String) input.get("accountType");
-            if (!List.of("SAVINGS", "CHECKING", "INVESTMENT").contains(accountType)) {
-                throw new IllegalArgumentException("올바르지 않은 계좌 유형입니다: " + accountType);
-            }
-        }
+    public Class<Vm0002InputDto> getInputDtoClass() {
+        return Vm0002InputDto.class;
     }
     
     @Override
-    protected Object executeBusinessLogic(Map<String, Object> input) {
-        String customerId = (String) input.get("customerId");
-        String accountType = (String) input.get("accountType");
+    public Class<Vm0002OutputDto> getOutputDtoClass() {
+        return Vm0002OutputDto.class;
+    }
+    
+    @Override
+    public CommonResponse<Vm0002OutputDto> processTyped(Vm0002InputDto inputDto) {
+        String customerId = inputDto.getCustomerId();
+        String accountType = inputDto.getAccountType();
         
         log.info("[vm0002] 계좌잔고 조회 시작 - customerId: {}, accountType: {}", customerId, accountType);
         
@@ -66,11 +60,13 @@ public class Vm0002Biz extends AbstractModuleService {
             
             if (customer == null) {
                 log.warn("[vm0002] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
-                Map<String, Object> notFoundResult = new HashMap<>();
-                notFoundResult.put("resultCode", "404");
-                notFoundResult.put("message", "고객을 찾을 수 없습니다");
-                notFoundResult.put("customerId", customerId);
-                return notFoundResult;
+                Vm0002OutputDto notFoundResult = Vm0002OutputDto.builder()
+                    .resultCode("404")
+                    .message("고객을 찾을 수 없습니다")
+                    .customerId(customerId)
+                    .inquiryTime(LocalDateTime.now())
+                    .build();
+                return CommonResponse.success(notFoundResult, "고객을 찾을 수 없습니다");
             }
             
             // 2. 계좌 목록 조회 (vm0002.c의 select_account_list 함수 역할)
@@ -78,7 +74,7 @@ public class Vm0002Biz extends AbstractModuleService {
             
             // 3. 총 잔고 계산 (vm0002.c의 calculate_total_balance 함수 역할)
             BigDecimal totalBalance = accounts.stream()
-                .map(account -> account.getBalance())
+                .map(AccountDto::getBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
             
             // 4. 계좌별 잔고 정보 보강 (vm0002.c의 get_account_detail 함수 역할)
@@ -96,28 +92,31 @@ public class Vm0002Biz extends AbstractModuleService {
                     .build();
             vm0002Dao.insertInquiryLog(inquiryLog);
             
-            // 6. 결과 반환
-            Map<String, Object> result = new HashMap<>();
-            result.put("resultCode", "200");
-            result.put("message", "계좌잔고 조회 성공");
-            result.put("customerId", customerId);
-            result.put("accountCount", accounts.size());
-            result.put("totalBalance", totalBalance);
-            result.put("accounts", accounts);
-            result.put("inquiryTime", LocalDateTime.now());
+            // 6. 결과 반환 (타입 안전한 DTO)
+            Vm0002OutputDto result = Vm0002OutputDto.builder()
+                .resultCode("200")
+                .message("계좌잔고 조회 성공")
+                .customerId(customerId)
+                .accountCount(accounts.size())
+                .totalBalance(totalBalance)
+                .accounts(accounts)
+                .inquiryTime(LocalDateTime.now())
+                .build();
             
             log.info("[vm0002] 계좌잔고 조회 완료 - customerId: {}, 계좌수: {}, 총잔고: {}", 
                     customerId, accounts.size(), totalBalance);
             
-            return result;
+            return CommonResponse.success(result, "계좌잔고 조회 성공");
             
         } catch (Exception e) {
             log.error("[vm0002] 계좌잔고 조회 중 오류 발생", e);
-            Map<String, Object> errorResult = new HashMap<>();
-            errorResult.put("resultCode", "500");
-            errorResult.put("message", "계좌잔고 조회 중 오류가 발생했습니다");
-            errorResult.put("error", e.getMessage());
-            return errorResult;
+            Vm0002OutputDto errorResult = Vm0002OutputDto.builder()
+                .resultCode("500")
+                .message("계좌잔고 조회 중 오류가 발생했습니다: " + e.getMessage())
+                .customerId(customerId)
+                .inquiryTime(LocalDateTime.now())
+                .build();
+            return CommonResponse.success(errorResult, "처리 중 오류 발생");
         }
     }
     
