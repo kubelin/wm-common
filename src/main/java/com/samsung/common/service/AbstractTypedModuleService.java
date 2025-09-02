@@ -4,12 +4,8 @@ import com.samsung.common.constants.ErrorCodes;
 import com.samsung.common.response.CommonResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 타입 안전한 추상 모듈 서비스 클래스
@@ -19,9 +15,6 @@ import java.util.Set;
 @Slf4j
 public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleService 
         implements TypedModuleService<I, O> {
-    
-    @Autowired(required = false)
-    private Validator validator;
     
     @Override
     @Transactional
@@ -33,10 +26,7 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
             // 1. Map을 Input DTO로 변환
             I inputDto = convertToDto(input, getInputDtoClass());
             
-            // 2. DTO 검증 (Jakarta Validation)
-            validateDto(inputDto);
-            
-            // 3. 타입 안전한 비즈니스 로직 실행
+            // 2. 타입 안전한 비즈니스 로직 실행 (각 모듈에서 검증 처리)
             O result = processTyped(inputDto);
             
             log.info("[{}] DTO 모듈 처리 완료 (HTTP용) - result: {}", serviceId, result);
@@ -65,10 +55,7 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
             // 1. Map을 Input DTO로 변환
             I inputDto = convertToDto(input, getInputDtoClass());
             
-            // 2. DTO 검증 (Jakarta Validation)
-            validateDto(inputDto);
-            
-            // 3. 타입 안전한 비즈니스 로직 실행
+            // 2. 타입 안전한 비즈니스 로직 실행 (각 모듈에서 검증 처리)
             O result = processTyped(inputDto);
             
             // 4. Output DTO가 요청된 타입과 일치하는지 확인하고 변환
@@ -91,23 +78,6 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
         }
     }
     
-    /**
-     * Jakarta Validation을 사용한 DTO 검증
-     */
-    protected void validateDto(I inputDto) {
-        if (validator == null) {
-            return; // Validator가 없으면 검증 스킵
-        }
-        
-        Set<ConstraintViolation<I>> violations = validator.validate(inputDto);
-        if (!violations.isEmpty()) {
-            StringBuilder sb = new StringBuilder("입력 데이터 검증 실패: ");
-            for (ConstraintViolation<I> violation : violations) {
-                sb.append(violation.getMessage()).append("; ");
-            }
-            throw new IllegalArgumentException(sb.toString());
-        }
-    }
     
     /**
      * 타입 안전한 비즈니스 로직 실행 (각 구현체에서 구현)

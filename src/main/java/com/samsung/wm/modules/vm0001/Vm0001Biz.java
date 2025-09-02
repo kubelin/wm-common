@@ -1,7 +1,6 @@
 package com.samsung.wm.modules.vm0001;
 
 import com.samsung.common.service.AbstractTypedModuleService;
-import com.samsung.common.response.CommonResponse;
 import com.samsung.wm.modules.vm0001.dao.Vm0001Dao;
 import com.samsung.wm.modules.vm0001.dto.*;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +45,9 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
     
     @Override
     public Vm0001OutputDto processTyped(Vm0001InputDto inputDto) {
+        // 입력 검증
+        validateInput(inputDto);
+        
         String customerId = inputDto.getCustomerId();
         log.info("[vm0001] 고객정보 조회 시작 - customerId: {}", customerId);
         
@@ -91,6 +93,28 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
                 .message("고객정보 조회 중 오류가 발생했습니다: " + e.getMessage())
                 .accessTime(LocalDateTime.now())
                 .build();
+        }
+    }
+    
+    /**
+     * VM0001 입력 데이터 검증
+     */
+    private void validateInput(Vm0001InputDto inputDto) {
+        if (inputDto == null) {
+            throw new IllegalArgumentException("입력 데이터가 필요합니다");
+        }
+        
+        String customerId = inputDto.getCustomerId();
+        if (customerId == null || customerId.trim().isEmpty()) {
+            throw new IllegalArgumentException("고객ID는 필수 입력입니다");
+        }
+        
+        if (customerId.length() != 10) {
+            throw new IllegalArgumentException("고객ID는 10자리여야 합니다");
+        }
+        
+        if (!customerId.matches("^[A-Z0-9]+$")) {
+            throw new IllegalArgumentException("고객ID는 영문 대문자와 숫자만 허용됩니다");
         }
     }
 }

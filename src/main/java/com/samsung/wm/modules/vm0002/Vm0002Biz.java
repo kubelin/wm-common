@@ -1,7 +1,6 @@
 package com.samsung.wm.modules.vm0002;
 
 import com.samsung.common.service.AbstractTypedModuleService;
-import com.samsung.common.response.CommonResponse;
 import com.samsung.wm.modules.vm0001.dto.CustomerDto;
 import com.samsung.wm.modules.vm0002.dao.Vm0002Dao;
 import com.samsung.wm.modules.vm0002.dto.*;
@@ -49,6 +48,9 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
     
     @Override
     public Vm0002OutputDto processTyped(Vm0002InputDto inputDto) {
+        // 입력 검증
+        validateInput(inputDto);
+        
         String customerId = inputDto.getCustomerId();
         String accountType = inputDto.getAccountType();
         
@@ -128,5 +130,34 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
             case "INVESTMENT" -> 4.0;
             default -> 1.0;
         };
+    }
+    
+    /**
+     * VM0002 입력 데이터 검증
+     */
+    private void validateInput(Vm0002InputDto inputDto) {
+        if (inputDto == null) {
+            throw new IllegalArgumentException("입력 데이터가 필요합니다");
+        }
+        
+        String customerId = inputDto.getCustomerId();
+        if (customerId == null || customerId.trim().isEmpty()) {
+            throw new IllegalArgumentException("고객ID는 필수 입력입니다");
+        }
+        
+        if (customerId.length() != 10) {
+            throw new IllegalArgumentException("고객ID는 10자리여야 합니다");
+        }
+        
+        if (!customerId.matches("^[A-Z0-9]+$")) {
+            throw new IllegalArgumentException("고객ID는 영문 대문자와 숫자만 허용됩니다");
+        }
+        
+        String accountType = inputDto.getAccountType();
+        if (accountType != null && !accountType.trim().isEmpty()) {
+            if (!accountType.matches("^(SAVINGS|CHECKING|INVESTMENT|ALL)$")) {
+                throw new IllegalArgumentException("계좌유형은 SAVINGS, CHECKING, INVESTMENT, ALL만 허용됩니다");
+            }
+        }
     }
 }
