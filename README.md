@@ -20,7 +20,7 @@
 
 ### Factory + Input/Output DTO 패턴의 장점
 - **🏭 타입 안전성**: Input/Output DTO로 컴파일 타임 타입 검사
-- **📝 자동 검증**: Jakarta Validation으로 입력 데이터 자동 검증
+- **📝 모듈별 검증**: 각 모듈의 비즈니스 규칙에 따른 입력 데이터 검증
 - **🔄 양방향 호환**: Map 기반과 DTO 기반 API 동시 지원
 - **📊 명확한 인터페이스**: 각 모듈별 명시적인 입출력 스키마
 - **🎯 단일 진입점**: 모든 모듈을 하나의 REST Controller로 처리
@@ -80,7 +80,6 @@ classDiagram
         +process(Map) CommonResponse
         +process(Map, Class~T~) T
         +processTyped(I) O
-        #validateDto(I) void
     }
     
     class Vm0001Biz {
@@ -88,6 +87,7 @@ classDiagram
         +processTyped(Vm0001InputDto) Vm0001OutputDto
         +getInputDtoClass() Class~Vm0001InputDto~
         +getOutputDtoClass() Class~Vm0001OutputDto~
+        -validateInput(Vm0001InputDto) void
     }
     
     class Vm0002Biz {
@@ -95,6 +95,7 @@ classDiagram
         +processTyped(Vm0002InputDto) Vm0002OutputDto
         +getInputDtoClass() Class~Vm0002InputDto~
         +getOutputDtoClass() Class~Vm0002OutputDto~
+        -validateInput(Vm0002InputDto) void
     }
     
     class ModuleServiceFactory {
@@ -120,7 +121,7 @@ classDiagram
     }
     
     class Vm0001InputDto {
-        @NotBlank customerId String
+        +customerId String
     }
     
     class Vm0001OutputDto {
@@ -131,7 +132,7 @@ classDiagram
     }
     
     class Vm0002InputDto {
-        @NotBlank customerId String
+        +customerId String
         +accountType String
     }
     
@@ -189,10 +190,10 @@ sequenceDiagram
     Note over Service: Generic Method with Class<T>
     
     Service->>Service: convertToDto(inputMap, Vm0001InputDto.class)
-    Service->>Service: validateDto(inputDto)
-    Note over Service: Jakarta Validation
-    
     Service->>Service: processTyped(inputDto)
+    
+    Service->>Service: validateInput(inputDto)
+    Note over Service: VM0001 Business Rules Validation
     Service->>DAO: selectCustomer(customerId)
     DAO->>DB: SQL Query
     DB->>DAO: CustomerDto
@@ -226,8 +227,9 @@ sequenceDiagram
     BizCaller->>Service: process(inputMap, Vm0001OutputDto.class)
     Note over BizCaller,Service: Type-safe Generic Method
     
-    Service->>Service: convertToDto & validateDto
+    Service->>Service: convertToDto(inputMap, Vm0001InputDto.class)
     Service->>Service: processTyped(inputDto)
+    Service->>Service: validateInput(inputDto)
     Service->>DAO: selectCustomer & insertAccessLog
     DAO->>DB: SQL Operations
     DB->>DAO: Results
@@ -426,9 +428,7 @@ src/main/java/com/samsung/
 // VM0001 Input DTO
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class Vm0001InputDto {
-    @NotBlank(message = "고객ID는 필수입니다")
-    @Size(min = 7, max = 7, message = "고객ID는 7자리여야 합니다")
-    private String customerId;
+    private String customerId; // 10자리 영문대문자+숫자 (비즈니스 로직에서 검증)
 }
 
 // VM0001 Output DTO  
@@ -583,16 +583,9 @@ POST /api/module/vm0002/dto
 // VM0003 입금 처리 Input DTO
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 public class Vm0003InputDto {
-    @NotBlank(message = "계좌번호는 필수입니다")
-    @Size(min = 12, max = 12, message = "계좌번호는 12자리여야 합니다")
-    private String accountNo;
-    
-    @NotNull(message = "입금액은 필수입니다")
-    @DecimalMin(value = "1000", message = "최소 입금액은 1,000원입니다")
-    private BigDecimal amount;
-    
-    @Size(max = 100, message = "입금 메모는 100자 이하여야 합니다")
-    private String memo;
+    private String accountNo;     // 계좌번호 (비즈니스 로직에서 검증)
+    private BigDecimal amount;    // 입금액 (비즈니스 로직에서 검증)
+    private String memo;          // 입금 메모 (비즈니스 로직에서 검증)
 }
 
 // VM0003 입금 처리 Output DTO
@@ -704,8 +697,8 @@ if ("200".equals(customerData.getResultCode())) {
     // 비즈니스 로직...
 }
 
-// Jakarta Validation 자동 적용
-@NotNull @DecimalMin("1000") BigDecimal amount; // 입력 검증 자동
+// 모듈별 비즈니스 검증 로직 적용
+private BigDecimal amount; // validateInput()에서 검증 처리
 ```
 
 #### 🚀 확장성과 생산성
