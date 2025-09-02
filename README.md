@@ -65,21 +65,13 @@ classDiagram
         +getOutputDtoClass() Class~O~
     }
     
-    class AbstractModuleService {
-        <<abstract>>
-        +process(Map) CommonResponse
-        +process(Map, Class~T~) T
-        #validateInput(Map) void
-        #executeBusinessLogic(Map) Object
-        #convertToDto(Map, Class) T
-        #convertToMap(Object) Map
-    }
-    
     class AbstractTypedModuleService {
         <<abstract>>
         +process(Map) CommonResponse
         +process(Map, Class~T~) T
         +processTyped(I) O
+        #convertToDto(Map, Class) T
+        #convertToMap(Object) Map
     }
     
     class Vm0001Biz {
@@ -145,10 +137,8 @@ classDiagram
     }
     
     ModuleService <|-- TypedModuleService
-    ModuleService <|.. AbstractModuleService
     ModuleService <|.. DefaultModuleService
     TypedModuleService <|.. AbstractTypedModuleService
-    AbstractModuleService <|-- AbstractTypedModuleService
     AbstractTypedModuleService <|-- Vm0001Biz
     AbstractTypedModuleService <|-- Vm0002Biz
     

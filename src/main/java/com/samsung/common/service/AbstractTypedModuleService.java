@@ -4,6 +4,7 @@ import com.samsung.common.constants.ErrorCodes;
 import com.samsung.common.response.CommonResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -13,8 +14,9 @@ import java.util.Map;
  * BIZ 레이어에서 직접 호출 가능
  */
 @Slf4j
-public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleService 
-        implements TypedModuleService<I, O> {
+public abstract class AbstractTypedModuleService<I, O> implements TypedModuleService<I, O> {
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Override
     @Transactional
@@ -88,16 +90,30 @@ public abstract class AbstractTypedModuleService<I, O> extends AbstractModuleSer
     @Override
     public abstract O processTyped(I inputDto);
     
-    // === 기존 Map 기반 메소드들을 오버라이드하여 사용하지 않도록 함 ===
+    // === DTO 변환 유틸리티 메소드들 ===
     
-    @Override
-    protected void validateInput(Map<String, Object> input) {
-        // DTO 검증을 사용하므로 이 메소드는 사용하지 않음
+    /**
+     * Map을 DTO로 변환
+     */
+    protected <T> T convertToDto(Map<String, Object> input, Class<T> dtoClass) {
+        try {
+            return objectMapper.convertValue(input, dtoClass);
+        } catch (Exception e) {
+            log.error("Map -> DTO 변환 중 오류 발생: {}", e.getMessage());
+            throw new IllegalArgumentException("입력 데이터 변환에 실패했습니다: " + e.getMessage());
+        }
     }
     
-    @Override
-    protected Object executeBusinessLogic(Map<String, Object> input) {
-        // processTyped()를 사용하므로 이 메소드는 사용하지 않음
-        throw new UnsupportedOperationException("TypedModuleService는 processTyped() 메소드를 사용하세요");
+    /**
+     * DTO를 Map으로 변환
+     */
+    @SuppressWarnings("unchecked")
+    protected Map<String, Object> convertToMap(Object dto) {
+        try {
+            return objectMapper.convertValue(dto, Map.class);
+        } catch (Exception e) {
+            log.error("DTO -> Map 변환 중 오류 발생: {}", e.getMessage());
+            throw new IllegalArgumentException("출력 데이터 변환에 실패했습니다: " + e.getMessage());
+        }
     }
 }
