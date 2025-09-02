@@ -143,13 +143,12 @@ public class CommonModuleController {
             TypedModuleService<Vm0001InputDto, Vm0001OutputDto> service = 
                 (TypedModuleService<Vm0001InputDto, Vm0001OutputDto>) factory.getService("vm0001");
             
-            CommonResponse<Vm0001OutputDto> response = service.processTyped(inputDto);
+            // 서비스에서 직접 DTO를 받아옴
+            Vm0001OutputDto result = service.processTyped(inputDto);
             
-            if (response.isSuccess()) {
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.badRequest().body(response);
-            }
+            // 컨트롤러에서 CommonResponse로 래핑
+            CommonResponse<Vm0001OutputDto> response = CommonResponse.success(result, "VM0001 처리 완료");
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             log.error("VM0001 DTO 처리 중 예외 발생", e);
@@ -175,13 +174,12 @@ public class CommonModuleController {
             TypedModuleService<Vm0002InputDto, Vm0002OutputDto> service = 
                 (TypedModuleService<Vm0002InputDto, Vm0002OutputDto>) factory.getService("vm0002");
             
-            CommonResponse<Vm0002OutputDto> response = service.processTyped(inputDto);
+            // 서비스에서 직접 DTO를 받아옴
+            Vm0002OutputDto result = service.processTyped(inputDto);
             
-            if (response.isSuccess()) {
-                return ResponseEntity.ok(response);
-            } else {
-                return ResponseEntity.badRequest().body(response);
-            }
+            // 컨트롤러에서 CommonResponse로 래핑
+            CommonResponse<Vm0002OutputDto> response = CommonResponse.success(result, "VM0002 처리 완료");
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             log.error("VM0002 DTO 처리 중 예외 발생", e);

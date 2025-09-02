@@ -30,7 +30,7 @@ public class ModuleServiceFactory {
                 .collect(toMap(ModuleService::getServiceId, identity()));
         
         // 기본 서비스 (서비스를 찾을 수 없을 때 사용)
-        this.defaultService = new DefaultModuleService();
+        this.defaultService = new com.samsung.common.service.DefaultModuleService();
         
         // 등록된 서비스들 로그 출력
         services.keySet().forEach(serviceId -> 
@@ -75,27 +75,5 @@ public class ModuleServiceFactory {
      */
     public boolean hasService(String serviceId) {
         return services.containsKey(serviceId);
-    }
-    
-    // === 내부 기본 서비스 ===
-    
-    private static class DefaultModuleService implements ModuleService {
-        @Override
-        public String getServiceId() {
-            return "default";
-        }
-        
-        @Override
-        public com.samsung.common.response.CommonResponse<?> process(Map<String, Object> input) {
-            return com.samsung.common.response.CommonResponse.error(
-                "SERVICE_NOT_FOUND", 
-                "해당 서비스를 찾을 수 없습니다"
-            );
-        }
-        
-        @Override
-        public String getDescription() {
-            return "기본 서비스 (서비스를 찾을 수 없을 때 사용)";
-        }
     }
 }

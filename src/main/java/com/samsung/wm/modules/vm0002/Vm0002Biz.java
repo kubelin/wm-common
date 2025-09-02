@@ -48,7 +48,7 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
     }
     
     @Override
-    public CommonResponse<Vm0002OutputDto> processTyped(Vm0002InputDto inputDto) {
+    public Vm0002OutputDto processTyped(Vm0002InputDto inputDto) {
         String customerId = inputDto.getCustomerId();
         String accountType = inputDto.getAccountType();
         
@@ -60,13 +60,12 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
             
             if (customer == null) {
                 log.warn("[vm0002] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
-                Vm0002OutputDto notFoundResult = Vm0002OutputDto.builder()
+                return Vm0002OutputDto.builder()
                     .resultCode("404")
                     .message("고객을 찾을 수 없습니다")
                     .customerId(customerId)
                     .inquiryTime(LocalDateTime.now())
                     .build();
-                return CommonResponse.success(notFoundResult, "고객을 찾을 수 없습니다");
             }
             
             // 2. 계좌 목록 조회 (vm0002.c의 select_account_list 함수 역할)
@@ -106,17 +105,16 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
             log.info("[vm0002] 계좌잔고 조회 완료 - customerId: {}, 계좌수: {}, 총잔고: {}", 
                     customerId, accounts.size(), totalBalance);
             
-            return CommonResponse.success(result, "계좌잔고 조회 성공");
+            return result;
             
         } catch (Exception e) {
             log.error("[vm0002] 계좌잔고 조회 중 오류 발생", e);
-            Vm0002OutputDto errorResult = Vm0002OutputDto.builder()
+            return Vm0002OutputDto.builder()
                 .resultCode("500")
                 .message("계좌잔고 조회 중 오류가 발생했습니다: " + e.getMessage())
                 .customerId(customerId)
                 .inquiryTime(LocalDateTime.now())
                 .build();
-            return CommonResponse.success(errorResult, "처리 중 오류 발생");
         }
     }
     

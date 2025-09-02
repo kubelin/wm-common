@@ -45,7 +45,7 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
     }
     
     @Override
-    public CommonResponse<Vm0001OutputDto> processTyped(Vm0001InputDto inputDto) {
+    public Vm0001OutputDto processTyped(Vm0001InputDto inputDto) {
         String customerId = inputDto.getCustomerId();
         log.info("[vm0001] 고객정보 조회 시작 - customerId: {}", customerId);
         
@@ -55,12 +55,11 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
             
             if (customer == null) {
                 log.warn("[vm0001] 고객을 찾을 수 없습니다 - customerId: {}", customerId);
-                Vm0001OutputDto notFoundResult = Vm0001OutputDto.builder()
+                return Vm0001OutputDto.builder()
                     .resultCode("404")
                     .message("고객을 찾을 수 없습니다")
                     .accessTime(LocalDateTime.now())
                     .build();
-                return CommonResponse.success(notFoundResult, "고객을 찾을 수 없습니다");
             }
             
             // 2. 접근 로그 기록 (vm0001.c의 insert_access_log 함수 역할)
@@ -83,16 +82,15 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
                 .build();
             
             log.info("[vm0001] 고객정보 조회 완료 - customerId: {}", customerId);
-            return CommonResponse.success(result, "고객정보 조회 성공");
+            return result;
             
         } catch (Exception e) {
             log.error("[vm0001] 고객정보 조회 중 오류 발생", e);
-            Vm0001OutputDto errorResult = Vm0001OutputDto.builder()
+            return Vm0001OutputDto.builder()
                 .resultCode("500")
                 .message("고객정보 조회 중 오류가 발생했습니다: " + e.getMessage())
                 .accessTime(LocalDateTime.now())
                 .build();
-            return CommonResponse.success(errorResult, "처리 중 오류 발생");
         }
     }
 }

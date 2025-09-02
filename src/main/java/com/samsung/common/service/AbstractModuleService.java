@@ -129,6 +129,7 @@ public abstract class AbstractModuleService implements ModuleService {
     /**
      * DTO를 Map으로 변환
      */
+    @SuppressWarnings("unchecked")
     protected Map<String, Object> convertToMap(Object dto) {
         try {
             return objectMapper.convertValue(dto, Map.class);
