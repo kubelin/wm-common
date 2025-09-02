@@ -54,12 +54,13 @@ classDiagram
         <<interface>>
         +getServiceId() String
         +process(Map) CommonResponse
+        +process(Map, Class~T~) T
         +getDescription() String
     }
     
     class TypedModuleService {
         <<interface>>
-        +processTyped(I) CommonResponse~O~
+        +processTyped(I) O
         +getInputDtoClass() Class~I~
         +getOutputDtoClass() Class~O~
     }
@@ -67,6 +68,7 @@ classDiagram
     class AbstractModuleService {
         <<abstract>>
         +process(Map) CommonResponse
+        +process(Map, Class~T~) T
         #validateInput(Map) void
         #executeBusinessLogic(Map) Object
         #convertToDto(Map, Class) T
@@ -76,22 +78,23 @@ classDiagram
     class AbstractTypedModuleService {
         <<abstract>>
         +process(Map) CommonResponse
-        +processTyped(I) CommonResponse~O~
+        +process(Map, Class~T~) T
+        +processTyped(I) O
         #validateDto(I) void
     }
     
     class Vm0001Biz {
         +getServiceId() String
-        +processTyped(Vm0001InputDto) CommonResponse~Vm0001OutputDto~
-        +getInputDtoClass() Class
-        +getOutputDtoClass() Class
+        +processTyped(Vm0001InputDto) Vm0001OutputDto
+        +getInputDtoClass() Class~Vm0001InputDto~
+        +getOutputDtoClass() Class~Vm0001OutputDto~
     }
     
     class Vm0002Biz {
         +getServiceId() String
-        +processTyped(Vm0002InputDto) CommonResponse~Vm0002OutputDto~
-        +getInputDtoClass() Class
-        +getOutputDtoClass() Class
+        +processTyped(Vm0002InputDto) Vm0002OutputDto
+        +getInputDtoClass() Class~Vm0002InputDto~
+        +getOutputDtoClass() Class~Vm0002OutputDto~
     }
     
     class ModuleServiceFactory {
@@ -106,10 +109,18 @@ classDiagram
         +processModule(String, Map) ResponseEntity
         +processVm0001Dto(Vm0001InputDto) ResponseEntity
         +processVm0002Dto(Vm0002InputDto) ResponseEntity
+        -convertToMap(Object) Map
+    }
+    
+    class DefaultModuleService {
+        +getServiceId() String
+        +process(Map) CommonResponse
+        +process(Map, Class~T~) T
+        +getDescription() String
     }
     
     class Vm0001InputDto {
-        +customerId String
+        @NotBlank customerId String
     }
     
     class Vm0001OutputDto {
@@ -120,7 +131,7 @@ classDiagram
     }
     
     class Vm0002InputDto {
-        +customerId String
+        @NotBlank customerId String
         +accountType String
     }
     
@@ -134,12 +145,14 @@ classDiagram
     
     ModuleService <|-- TypedModuleService
     ModuleService <|.. AbstractModuleService
+    ModuleService <|.. DefaultModuleService
     TypedModuleService <|.. AbstractTypedModuleService
     AbstractModuleService <|-- AbstractTypedModuleService
     AbstractTypedModuleService <|-- Vm0001Biz
     AbstractTypedModuleService <|-- Vm0002Biz
     
     ModuleServiceFactory *-- ModuleService
+    ModuleServiceFactory ..> DefaultModuleService
     CommonModuleController --> ModuleServiceFactory
     CommonModuleController ..> Vm0001InputDto
     CommonModuleController ..> Vm0001OutputDto
@@ -166,14 +179,20 @@ sequenceDiagram
     Client->>Controller: POST /api/module/vm0001/dto
     Note over Client,Controller: Vm0001InputDto
     
+    Controller->>Controller: convertToMap(inputDto)
+    Note over Controller: DTO → Map 변환
+    
     Controller->>Factory: getService("vm0001")
     Factory->>Controller: return Vm0001Biz
     
-    Controller->>Service: processTyped(inputDto)
+    Controller->>Service: process(inputMap, Vm0001OutputDto.class)
+    Note over Service: Generic Method with Class<T>
     
+    Service->>Service: convertToDto(inputMap, Vm0001InputDto.class)
     Service->>Service: validateDto(inputDto)
     Note over Service: Jakarta Validation
     
+    Service->>Service: processTyped(inputDto)
     Service->>DAO: selectCustomer(customerId)
     DAO->>DB: SQL Query
     DB->>DAO: CustomerDto
@@ -183,10 +202,41 @@ sequenceDiagram
     DAO->>DB: INSERT
     
     Service->>Service: build Vm0001OutputDto
-    Service->>Controller: CommonResponse<Vm0001OutputDto>
+    Service->>Controller: Vm0001OutputDto (직접 반환)
     
+    Controller->>Controller: CommonResponse.success(result)
     Controller->>Client: ResponseEntity<CommonResponse<Vm0001OutputDto>>
-    Note over Controller,Client: Type-safe response
+    Note over Controller,Client: HTTP Response Wrapping
+```
+
+### BIZ 레이어 직접 호출 플로우
+
+```mermaid
+sequenceDiagram
+    participant BizCaller as OtherBizService
+    participant Factory as ModuleServiceFactory
+    participant Service as Vm0001Biz
+    participant DAO as Vm0001Dao
+    participant DB as Database
+    
+    BizCaller->>BizCaller: Map.of("customerId", "CUST001")
+    BizCaller->>Factory: getService("vm0001")
+    Factory->>BizCaller: return Vm0001Biz
+    
+    BizCaller->>Service: process(inputMap, Vm0001OutputDto.class)
+    Note over BizCaller,Service: Type-safe Generic Method
+    
+    Service->>Service: convertToDto & validateDto
+    Service->>Service: processTyped(inputDto)
+    Service->>DAO: selectCustomer & insertAccessLog
+    DAO->>DB: SQL Operations
+    DB->>DAO: Results
+    DAO->>Service: DTOs
+    
+    Service->>BizCaller: Vm0001OutputDto (직접 반환)
+    Note over BizCaller: No HTTP wrapping, 순수 DTO
+    
+    BizCaller->>BizCaller: Business Logic with DTO
 ```
 
 ## 📋 Factory + DTO 패턴 구현 가이드
@@ -409,18 +459,45 @@ public class Vm0001Biz extends AbstractTypedModuleService<Vm0001InputDto, Vm0001
     public Class<Vm0001OutputDto> getOutputDtoClass() { return Vm0001OutputDto.class; }
     
     @Override
-    public CommonResponse<Vm0001OutputDto> processTyped(Vm0001InputDto inputDto) {
-        // 타입 안전한 비즈니스 로직 구현
+    public Vm0001OutputDto processTyped(Vm0001InputDto inputDto) {
+        // 타입 안전한 비즈니스 로직 구현 (직접 DTO 반환)
         CustomerDto customer = vm0001Dao.selectCustomer(inputDto.getCustomerId());
         
-        Vm0001OutputDto result = Vm0001OutputDto.builder()
+        return Vm0001OutputDto.builder()
             .resultCode("200")
             .message("고객정보 조회 성공")
             .customerInfo(customer)
             .accessTime(LocalDateTime.now())
             .build();
+    }
+}
+```
+
+#### C. Generic Process Method 활용
+```java
+// BIZ 레이어에서 직접 호출 (권장 방법)
+@Service
+@RequiredArgsConstructor
+public class IntegratedBiz {
+    private final ModuleServiceFactory factory;
+    
+    public CustomerAnalysis analyzeCustomer(String customerId) {
+        // 고객정보 조회 - Generic Method 사용
+        Map<String, Object> vm0001Input = Map.of("customerId", customerId);
+        Vm0001OutputDto customerInfo = factory.getService("vm0001")
+            .process(vm0001Input, Vm0001OutputDto.class);
             
-        return CommonResponse.success(result, "고객정보 조회 성공");
+        // 계좌정보 조회 - Generic Method 사용
+        Map<String, Object> vm0002Input = Map.of("customerId", customerId);
+        Vm0002OutputDto accountInfo = factory.getService("vm0002")
+            .process(vm0002Input, Vm0002OutputDto.class);
+        
+        // 직접 DTO로 비즈니스 로직 처리
+        return CustomerAnalysis.builder()
+            .customer(customerInfo.getCustomerInfo())
+            .totalBalance(accountInfo.getTotalBalance())
+            .riskLevel(calculateRiskLevel(accountInfo))
+            .build();
     }
 }
 ```
@@ -598,39 +675,50 @@ POST /api/module/vm0003/dto
 }
 ```
 
-### Factory Pattern 장점 요약
+### Generic Process Method 활용 예시
 
-#### 🔄 양방향 호환성
+#### 🔄 다양한 호출 방법
 ```java
-// 기존 Map 기반 API (하위 호환)
-POST /api/module/vm0003
-{ "accountNo": "100100100001", "amount": 50000 }
+// 1. BIZ 레이어 직접 호출 (권장)
+ModuleService service = factory.getService("vm0003");
+Map<String, Object> input = Map.of("accountNo", "100100100001", "amount", 50000);
+Vm0003OutputDto result = service.process(input, Vm0003OutputDto.class);
 
-// 새로운 DTO 기반 API (권장)  
+// 2. HTTP API 호출 
 POST /api/module/vm0003/dto
 { "accountNo": "100100100001", "amount": 50000, "memo": "급여 입금" }
+
+// 3. 기존 Map 기반 API (하위 호환)
+POST /api/module/vm0003
+{ "accountNo": "100100100001", "amount": 50000 }
 ```
 
-#### 🎯 타입 안전성
+#### 🎯 타입 안전성과 성능 최적화
 ```java
-// 컴파일 타임 타입 체크
-Vm0003InputDto input = Vm0003InputDto.builder()
-    .accountNo("100100100001")
-    .amount(new BigDecimal("50000"))  // BigDecimal 강제
-    .memo("급여 입금")
-    .build();
+// Generic Method: 한 번의 호출로 타입 안전한 결과
+Vm0001OutputDto customerData = moduleService.process(inputMap, Vm0001OutputDto.class);
+
+// 컴파일 타임 타입 체크 + 런타임 성능 최적화
+if ("200".equals(customerData.getResultCode())) {
+    CustomerDto customer = customerData.getCustomerInfo(); // 타입 안전
+    // 비즈니스 로직...
+}
 
 // Jakarta Validation 자동 적용
-@NotNull @DecimalMin("1000") BigDecimal amount;
+@NotNull @DecimalMin("1000") BigDecimal amount; // 입력 검증 자동
 ```
 
-#### 🚀 확장성
+#### 🚀 확장성과 생산성
 ```java
-// 새 모듈 추가 시 최소한의 코드
+// 새 모듈 추가 시 필요한 코드 (최소화)
 1. InputDto + OutputDto 정의 (2개 클래스)
 2. Dao 인터페이스 정의 (1개 인터페이스)  
-3. Biz 클래스 구현 (1개 클래스)
-4. Controller에 엔드포인트 추가 (1개 메소드)
+3. Biz 클래스 구현 (1개 클래스) 
+4. Generic Process Method 자동 상속 (추가 코드 불필요!)
+
+// BIZ 간 호출도 자동으로 타입 안전
+SomeOutputDto result = factory.getService("someModule")
+    .process(inputMap, SomeOutputDto.class); // 자동 타입 변환
 ```
 
 ## 🔧 개발 절차

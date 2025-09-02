@@ -104,11 +104,11 @@ public class CommonModuleController {
         log.info("서비스 상세 정보 조회 - serviceId: {}", serviceId);
         
         if (!factory.hasService(serviceId)) {
-            CommonResponse<Map<String, Object>> response = CommonResponse.error(
+            CommonResponse<Map<String, Object>> errorResponse = CommonResponse.error(
                 "SERVICE_NOT_FOUND",
                 "서비스를 찾을 수 없습니다: " + serviceId
             );
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(errorResponse);
         }
         
         ModuleService service = factory.getService(serviceId);
