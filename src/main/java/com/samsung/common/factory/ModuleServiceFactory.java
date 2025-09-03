@@ -1,5 +1,6 @@
 package com.samsung.common.factory;
 
+import com.samsung.common.service.ModuleService;
 import com.samsung.common.service.TypedModuleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -13,21 +14,24 @@ import static java.util.stream.Collectors.toMap;
 
 /**
  * 모듈 서비스 팩토리
- * ServiceId를 기반으로 적절한 TypedModuleService 구현체를 반환
+ * ServiceId를 기반으로 적절한 ModuleService 구현체를 반환
+ * Raw 타입 사용으로 심플한 인터페이스 제공
  */
 @Slf4j
 @Component
 public class ModuleServiceFactory {
     
-    private final Map<String, TypedModuleService<?,?>> services;
-    private final TypedModuleService<?,?> defaultService;
+    private final Map<String, ModuleService> services;
+    private final ModuleService defaultService;
     
     public ModuleServiceFactory(List<TypedModuleService<?,?>> serviceList) {
         log.info("ModuleServiceFactory 초기화 - 등록된 서비스 수: {}", serviceList.size());
         
         // Spring이 자동으로 모든 TypedModuleService 구현체들을 주입
+        // ModuleService 타입으로 캐스팅해서 저장 (TypedModuleService extends ModuleService)
         this.services = serviceList.stream()
-                .collect(toMap(TypedModuleService::getServiceId, identity()));
+                .collect(toMap(ModuleService::getServiceId, 
+                              service -> (ModuleService) service));
         
         // 기본 서비스 (서비스를 찾을 수 없을 때 사용)
         this.defaultService = new com.samsung.common.service.DefaultModuleService();
@@ -39,10 +43,10 @@ public class ModuleServiceFactory {
     }
     
     /**
-     * ServiceId로 TypedModuleService 조회
+     * ServiceId로 ModuleService 조회 (Raw 타입으로 심플하게 사용)
      */
-    public TypedModuleService<?,?> getService(String serviceId) {
-        TypedModuleService<?,?> service = services.get(serviceId);
+    public ModuleService getService(String serviceId) {
+        ModuleService service = services.get(serviceId);
         if (service == null) {
             log.warn("서비스를 찾을 수 없습니다: {} - 기본 서비스 사용", serviceId);
             return defaultService;

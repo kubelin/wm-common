@@ -8,7 +8,7 @@ import java.util.Map;
  * 기본 모듈 서비스
  * 서비스를 찾을 수 없을 때 사용되는 기본 구현체
  */
-public class DefaultModuleService implements TypedModuleService<Map<String, Object>, Object> {
+public class DefaultModuleService implements ModuleService {
     
     @Override
     public String getServiceId() {
@@ -31,20 +31,5 @@ public class DefaultModuleService implements TypedModuleService<Map<String, Obje
     @Override
     public String getDescription() {
         return "기본 서비스 (서비스를 찾을 수 없을 때 사용)";
-    }
-    
-    @Override
-    public Object processTyped(Map<String, Object> inputDto) {
-        throw new RuntimeException("해당 서비스를 찾을 수 없습니다");
-    }
-    
-    @Override
-    public Class<Map<String, Object>> getInputDtoClass() {
-        return (Class<Map<String, Object>>) (Class<?>) Map.class;
-    }
-    
-    @Override
-    public Class<Object> getOutputDtoClass() {
-        return Object.class;
     }
 }

@@ -50,12 +50,16 @@ vm9999.c + vm9999.h  →  Vm9999Biz.java (비즈니스 로직)
 
 ```mermaid
 classDiagram
-    class TypedModuleService {
+    class ModuleService {
         <<interface>>
         +getServiceId() String
         +process(Map) CommonResponse
         +process(Map, Class~T~) T
         +getDescription() String
+    }
+    
+    class TypedModuleService {
+        <<interface>>
         +processTyped(I) O
         +getInputDtoClass() Class~I~
         +getOutputDtoClass() Class~O~
@@ -132,12 +136,13 @@ classDiagram
         +accounts List~AccountDto~
     }
     
+    ModuleService <|-- TypedModuleService
+    ModuleService <|.. DefaultModuleService
     TypedModuleService <|.. AbstractTypedModuleService
-    TypedModuleService <|.. DefaultModuleService
     AbstractTypedModuleService <|-- Vm0001Biz
     AbstractTypedModuleService <|-- Vm0002Biz
     
-    ModuleServiceFactory *-- TypedModuleService
+    ModuleServiceFactory *-- ModuleService
     ModuleServiceFactory ..> DefaultModuleService
     CommonModuleController --> ModuleServiceFactory
     CommonModuleController ..> Vm0001InputDto
