@@ -37,12 +37,12 @@ public class Vm0002Biz extends AbstractTypedModuleService<Vm0002InputDto, Vm0002
     }
     
     @Override
-    public Class<Vm0002InputDto> getInputDtoClass() { 
+    protected Class<Vm0002InputDto> getInputDtoClass() { 
         return Vm0002InputDto.class;
     }
     
     @Override
-    public Class<Vm0002OutputDto> getOutputDtoClass() {
+    protected Class<Vm0002OutputDto> getOutputDtoClass() {
         return Vm0002OutputDto.class;
     }
     

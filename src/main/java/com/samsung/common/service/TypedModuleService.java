@@ -21,14 +21,4 @@ public interface TypedModuleService<I, O> extends ModuleService {
      * @return 출력 DTO (직접 반환, CommonResponse 래핑 없음)
      */
     O processTyped(I inputDto);
-    
-    /**
-     * Input DTO 클래스 반환 (런타임에 타입 정보를 위해 사용)
-     */
-    Class<I> getInputDtoClass();
-    
-    /**
-     * Output DTO 클래스 반환 (런타임에 타입 정보를 위해 사용)
-     */
-    Class<O> getOutputDtoClass();
 }

@@ -18,6 +18,16 @@ public abstract class AbstractTypedModuleService<I, O> implements TypedModuleSer
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
+    /**
+     * Input DTO 클래스 반환 (구현체에서 정의)
+     */
+    protected abstract Class<I> getInputDtoClass();
+    
+    /**
+     * Output DTO 클래스 반환 (구현체에서 정의)  
+     */
+    protected abstract Class<O> getOutputDtoClass();
+    
     @Override
     @Transactional
     public CommonResponse<?> process(Map<String, Object> input) {

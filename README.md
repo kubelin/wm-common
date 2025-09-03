@@ -61,8 +61,6 @@ classDiagram
     class TypedModuleService {
         <<interface>>
         +processTyped(I) O
-        +getInputDtoClass() Class~I~
-        +getOutputDtoClass() Class~O~
     }
     
     class AbstractTypedModuleService {
@@ -70,6 +68,8 @@ classDiagram
         +process(Map) CommonResponse
         +process(Map, Class~T~) T
         +processTyped(I) O
+        #getInputDtoClass() Class~I~
+        #getOutputDtoClass() Class~O~
         #convertToDto(Map, Class) T
         #convertToMap(Object) Map
     }
@@ -77,16 +77,16 @@ classDiagram
     class Vm0001Biz {
         +getServiceId() String
         +processTyped(Vm0001InputDto) Vm0001OutputDto
-        +getInputDtoClass() Class~Vm0001InputDto~
-        +getOutputDtoClass() Class~Vm0001OutputDto~
+        #getInputDtoClass() Class~Vm0001InputDto~
+        #getOutputDtoClass() Class~Vm0001OutputDto~
         -validateInput(Vm0001InputDto) void
     }
     
     class Vm0002Biz {
         +getServiceId() String
         +processTyped(Vm0002InputDto) Vm0002OutputDto
-        +getInputDtoClass() Class~Vm0002InputDto~
-        +getOutputDtoClass() Class~Vm0002OutputDto~
+        #getInputDtoClass() Class~Vm0002InputDto~
+        #getOutputDtoClass() Class~Vm0002OutputDto~
         -validateInput(Vm0002InputDto) void
     }
     
