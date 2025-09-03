@@ -2,7 +2,6 @@ package com.samsung.wm.controller;
 
 import com.samsung.common.factory.ModuleServiceFactory;
 import com.samsung.common.response.CommonResponse;
-import com.samsung.common.service.ModuleService;
 import com.samsung.common.service.TypedModuleService;
 import com.samsung.wm.modules.vm0001.dto.*;
 import com.samsung.wm.modules.vm0002.dto.*;
@@ -41,7 +40,7 @@ public class CommonModuleController {
         log.info("모듈 처리 요청 - serviceId: {}, input: {}", serviceId, input);
         
         try {
-            ModuleService service = factory.getService(serviceId);
+            TypedModuleService<?,?> service = factory.getService(serviceId);
             CommonResponse<?> response = service.process(input);
             
             if (response.isSuccess()) {
@@ -111,7 +110,7 @@ public class CommonModuleController {
             return ResponseEntity.status(404).body(errorResponse);
         }
         
-        ModuleService service = factory.getService(serviceId);
+        TypedModuleService<?,?> service = factory.getService(serviceId);
         Map<String, Object> serviceInfo = Map.of(
             "serviceId", service.getServiceId(),
             "description", service.getDescription(),
@@ -139,7 +138,7 @@ public class CommonModuleController {
         log.info("VM0001 DTO 처리 요청 - input: {}", inputDto);
         
         try {
-            ModuleService service = factory.getService("vm0001");
+            TypedModuleService<?,?> service = factory.getService("vm0001");
             
             // Map으로 변환해서 generic process 호출
             Map<String, Object> inputMap = convertToMap(inputDto);
@@ -185,7 +184,7 @@ public class CommonModuleController {
         log.info("VM0002 DTO 처리 요청 - input: {}", inputDto);
         
         try {
-            ModuleService service = factory.getService("vm0002");
+            TypedModuleService<?,?> service = factory.getService("vm0002");
             
             // Map으로 변환해서 generic process 호출
             Map<String, Object> inputMap = convertToMap(inputDto);
