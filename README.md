@@ -350,9 +350,331 @@ public class ConsultationService {
 3. **전략 패턴**: 알고리즘을 인터페이스로 분리하여 확장성 확보
 4. **공통 모듈**: C 함수들을 Java 정적 유틸리티로 변환
 
+### 전체 시스템 아키텍처 다이어그램
+
+```mermaid
+graph TD
+    subgraph "Client Layer"
+        Client[REST Client]
+    end
+    
+    subgraph "Controller Layer"  
+        WmController[WmCommonController]
+    end
+    
+    subgraph "Service Layer"
+        ConsultationSvc[ConsultationService]
+        InvestmentSvc[InvestmentPlanningService] 
+        PortfolioSvc[PortfolioManagementService]
+    end
+    
+    subgraph "Strategy Layer - Investment"
+        InvStrategy[InvestmentStrategy Interface]
+        ConservativeStrategy[ConservativeInvestmentStrategy]
+        AggressiveStrategy[AggressiveInvestmentStrategy<br/>향후 추가]
+        ModerateStrategy[ModerateInvestmentStrategy<br/>향후 추가]
+    end
+    
+    subgraph "Strategy Layer - Consultation" 
+        ConsStrategy[ConsultationStrategy Interface]
+        InitialStrategy[InitialConsultationStrategy]
+        PeriodicStrategy[PeriodicConsultationStrategy<br/>향후 추가]
+    end
+    
+    subgraph "Strategy Layer - Portfolio"
+        PortStrategy[PortfolioStrategy Interface]  
+        RebalancingStrategy[RebalancingStrategy]
+        OptimizationStrategy[OptimizationStrategy<br/>향후 추가]
+    end
+    
+    subgraph "Common Utilities"
+        StringUtil[StringUtil]
+        DateUtil[DateUtil]
+        FinancialCalc[FinancialCalculator]
+        DataConverter[DataConverter]
+    end
+    
+    Client --> WmController
+    WmController --> ConsultationSvc
+    WmController --> InvestmentSvc
+    WmController --> PortfolioSvc
+    
+    ConsultationSvc --> InitialStrategy
+    InvestmentSvc --> ConservativeStrategy
+    PortfolioSvc --> RebalancingStrategy
+    
+    ConservativeStrategy --> InvStrategy
+    InitialStrategy --> ConsStrategy
+    RebalancingStrategy --> PortStrategy
+    
+    ConsultationSvc --> StringUtil
+    InvestmentSvc --> FinancialCalc
+    PortfolioSvc --> DataConverter
+    
+    style ConservativeStrategy fill:#e1f5fe
+    style InitialStrategy fill:#e1f5fe  
+    style RebalancingStrategy fill:#e1f5fe
+    style AggressiveStrategy fill:#f3e5f5
+    style PeriodicStrategy fill:#f3e5f5
+    style OptimizationStrategy fill:#f3e5f5
+```
+
+### Strategy 패턴 클래스 다이어그램
+
+```mermaid
+classDiagram
+    class InvestmentStrategy {
+        <<interface>>
+        +execute(request: InvestmentRequest) InvestmentPlan
+        +getType() InvestmentType
+        +isApplicable(request: InvestmentRequest) boolean
+    }
+    
+    class ConservativeInvestmentStrategy {
+        +execute(request: InvestmentRequest) InvestmentPlan
+        +getType() InvestmentType
+        +isApplicable(request: InvestmentRequest) boolean
+        -createConservativeAllocations(amount: BigDecimal) List~AssetAllocation~
+    }
+    
+    class InvestmentPlanningService {
+        -conservativeStrategy: ConservativeInvestmentStrategy
+        +createInvestmentPlan(request: InvestmentRequest) InvestmentPlan
+        +createInvestmentPlanByType(request: InvestmentRequest, type: String) InvestmentPlan
+        -selectStrategy(type: String) InvestmentStrategy
+        -validateInvestmentRequest(request: InvestmentRequest) void
+    }
+    
+    class InvestmentRequest {
+        -customerId: String
+        -investmentAmount: BigDecimal
+        -investmentPeriod: String
+        -riskProfile: String
+        -investmentGoal: String
+    }
+    
+    class InvestmentPlan {
+        -customerId: String
+        -type: InvestmentType
+        -planName: String
+        -description: String
+        -totalAmount: BigDecimal
+        -allocations: List~AssetAllocation~
+        -parameters: Map~String,Object~
+        -createdAt: LocalDateTime
+        -expectedReturn: String
+        -riskLevel: String
+    }
+    
+    class AssetAllocation {
+        -assetType: String
+        -symbol: String
+        -amount: BigDecimal
+        -weight: Double
+    }
+    
+    class ConsultationStrategy {
+        <<interface>>
+        +execute(customerId: String) ConsultationResult
+        +getType() ConsultationType
+    }
+    
+    class InitialConsultationStrategy {
+        +execute(customerId: String) ConsultationResult
+        +getType() ConsultationType
+        -createInitialConsultationPlan(customerId: String) ConsultationResult
+    }
+    
+    class ConsultationService {
+        -initialStrategy: InitialConsultationStrategy
+        +performConsultation(customerId: String, type: String) ConsultationResult
+        -selectStrategy(type: String) ConsultationStrategy
+        -validateCustomerId(customerId: String) void
+    }
+    
+    %% Strategy Pattern Relationships
+    InvestmentStrategy <|.. ConservativeInvestmentStrategy : implements
+    InvestmentPlanningService --> InvestmentStrategy : uses
+    InvestmentPlanningService --> ConservativeInvestmentStrategy : injects
+    InvestmentStrategy ..> InvestmentRequest : uses
+    InvestmentStrategy ..> InvestmentPlan : creates
+    InvestmentPlan --> AssetAllocation : contains
+    
+    ConsultationStrategy <|.. InitialConsultationStrategy : implements
+    ConsultationService --> ConsultationStrategy : uses
+    ConsultationService --> InitialConsultationStrategy : injects
+    
+    %% Common Utilities (simplified)
+    InvestmentPlanningService ..> FinancialCalculator : uses
+    InvestmentPlanningService ..> DataConverter : uses
+    ConsultationService ..> StringUtil : uses
+```
+
+### 주요 설계 결정사항
+
+#### 1. 단순화된 Strategy 패턴
+- **Factory 패턴 제거**: Spring의 직접 의존성 주입 사용
+- **Switch 기반 선택**: 복잡한 Factory 대신 간단한 switch 문
+- **확장성**: 새 전략은 `@Component` 추가 + Service에 주입
+
+#### 2. C → Java 변환 전략
+- **절차지향 → 객체지향**: C 함수를 Java 정적 메소드로 변환
+- **구조체 → 클래스**: C struct를 Java 클래스(DTO)로 변환
+- **함수 포인터 → Strategy**: C 함수 포인터를 Strategy 패턴으로 변환
+
+#### 3. 확장 우선순위
+```java
+// 현재 구현된 전략들
+✅ ConservativeInvestmentStrategy  // 보수적 투자
+✅ InitialConsultationStrategy     // 초기 상담  
+✅ RebalancingStrategy            // 포트폴리오 리밸런싱
+
+// 향후 확장 예정  
+📋 AggressiveInvestmentStrategy   // 적극적 투자
+📋 ModerateInvestmentStrategy     // 중도적 투자
+📋 PeriodicConsultationStrategy   // 정기 상담
+📋 OptimizationStrategy          // 포트폴리오 최적화
+```
+
+### Strategy 패턴 vs Factory 패턴 비교
+
+#### Strategy 패턴의 장점 (현재 main 브랜치)
+```java
+// ✅ 단순하고 명확한 구조
+@Service 
+@RequiredArgsConstructor
+public class InvestmentPlanningService {
+    private final ConservativeInvestmentStrategy conservativeStrategy;
+    // private final AggressiveInvestmentStrategy aggressiveStrategy; // 향후 추가
+    
+    private InvestmentStrategy selectStrategy(String type) {
+        return switch (type.toUpperCase()) {
+            case "CONSERVATIVE" -> conservativeStrategy;
+            // case "AGGRESSIVE" -> aggressiveStrategy; // 향후 추가  
+            default -> conservativeStrategy;
+        };
+    }
+}
+
+// ✅ 장점
+// - 의존관계가 명확 (컴파일 타임 체크)
+// - 코드가 단순하고 이해하기 쉬움
+// - Spring DI의 타입 안전성 활용
+// - 메모리 효율성 (각 서비스마다 필요한 전략만 주입)
+
+// ❌ 단점  
+// - 새 전략 추가시 Service 클래스 수정 필요
+// - 런타임 동적 전략 선택 어려움
+// - 전략이 많아지면 Service 생성자가 복잡해짐
+```
+
+#### Factory 패턴의 장점 (feature/factory-service-pattern 브랜치)
+```java  
+// ✅ 동적이고 확장성이 높은 구조
+@Service
+@RequiredArgsConstructor  
+public class BusinessService {
+    private final ModuleServiceFactory factory;
+    
+    public void processMultipleModules(List<RequestItem> requests) {
+        for (RequestItem item : requests) {
+            // 런타임에 동적으로 모듈 결정
+            ModuleService service = factory.getService(item.getServiceId());
+            service.process(item.getData(), item.getOutputClass());
+        }
+    }
+}
+
+// ✅ 장점
+// - 런타임 동적 선택 가능  
+// - 새 전략 추가시 Factory만 자동 인식
+// - 복잡한 비즈니스 로직에서 여러 모듈 조합 용이
+// - 대규모 시스템에서 모듈 관리 편리
+
+// ❌ 단점
+// - 런타임 오류 가능성 (serviceId 오타 등)
+// - 코드 복잡도 증가  
+// - HashMap 조회 오버헤드 (미미하지만)
+```
+
+### 언제 어떤 패턴을 선택할까?
+
+#### Strategy 패턴이 적합한 경우
+- 🎯 **소규모 프로젝트**: 전략이 5개 이하
+- 🎯 **고정된 전략**: 컴파일 타임에 전략이 결정됨
+- 🎯 **단순한 비즈니스 로직**: 하나의 서비스에서 하나의 전략만 사용
+- 🎯 **타입 안전성 중요**: 컴파일 타임 오류 검출 필요
+
+#### Factory 패턴이 적합한 경우
+- 🏭 **대규모 프로젝트**: 전략/모듈이 10개 이상
+- 🏭 **동적 선택**: 런타임에 사용자 입력/데이터에 따라 전략 결정
+- 🏭 **복합 처리**: 한 번에 여러 모듈을 조합해서 처리
+- 🏭 **플러그인 아키텍처**: 모듈을 독립적으로 개발/배포
+
+### 실제 사용 예시 비교
+
+#### Strategy 패턴 예시 (main 브랜치)
+```java
+// 투자 계획 수립 - 단일 전략 사용
+@GetMapping("/investment-plan")  
+public ResponseEntity<?> createInvestmentPlan(
+    @RequestParam String customerId,
+    @RequestParam String riskProfile) {
+    
+    InvestmentRequest request = new InvestmentRequest(
+        customerId, amount, period, riskProfile, goal
+    );
+    
+    // 단일 전략으로 처리
+    InvestmentPlan plan = investmentService.createInvestmentPlan(request);
+    return ResponseEntity.ok(plan);
+}
+```
+
+#### Factory 패턴 예시 (feature 브랜치)
+```java
+// 복합 금융 상품 처리 - 다중 모듈 조합
+@PostMapping("/comprehensive-service")
+public ResponseEntity<?> comprehensiveService(@RequestBody CompositeRequest request) {
+    
+    List<ServiceResult> results = new ArrayList<>();
+    
+    // 고객정보 조회 (vm0001)
+    ModuleService customerService = factory.getService("vm0001");  
+    CustomerDto customer = customerService.process(
+        request.getCustomerData(), CustomerDto.class
+    );
+    
+    // 계좌잔고 조회 (vm0002)
+    ModuleService accountService = factory.getService("vm0002");
+    AccountDto account = accountService.process(
+        request.getAccountData(), AccountDto.class  
+    );
+    
+    // 리스크 분석 (vm0010)
+    ModuleService riskService = factory.getService("vm0010");
+    RiskAnalysisDto risk = riskService.process(
+        request.getRiskData(), RiskAnalysisDto.class
+    );
+    
+    return ResponseEntity.ok(CompositeResponse.of(customer, account, risk));
+}
+```
+
+### 성능 비교
+
+| 항목 | Strategy 패턴 | Factory 패턴 |
+|------|---------------|--------------|
+| **메모리 사용량** | 낮음 (필요한 전략만) | 중간 (모든 전략 로드) |
+| **실행 성능** | 높음 (직접 호출) | 약간 낮음 (HashMap 조회) |
+| **확장성** | 낮음 (코드 수정 필요) | 높음 (자동 인식) |  
+| **유지보수성** | 높음 (단순함) | 중간 (복잡도 증가) |
+| **테스트 용이성** | 높음 (Mock 쉬움) | 중간 (Factory Mock) |
+| **런타임 안전성** | 높음 (컴파일 체크) | 낮음 (런타임 오류) |
+
 ### 확장 가이드
 
-#### 새로운 전략 추가하기
+#### 새로운 전략 추가하기 (Strategy 패턴)
 1. **전략 인터페이스 구현**
 ```java
 @Component
