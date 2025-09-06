@@ -75,7 +75,7 @@ public abstract class AbstractTypedModuleService<I, O> implements TypedModuleSer
             // 2. 타입 안전한 비즈니스 로직 실행 (각 모듈에서 검증 처리)
             O result = processTyped(inputDto);
             
-            // 4. Output DTO가 요청된 타입과 일치하는지 확인하고 변환
+            // 3. Output DTO가 요청된 타입과 일치하는지 확인하고 변환
             if (outputClass.isInstance(result)) {
                 T typedResult = (T) result;
                 log.info("[{}] 타입 안전 DTO 모듈 처리 완료 (BIZ용) - result: {}", serviceId, typedResult);
@@ -85,13 +85,33 @@ public abstract class AbstractTypedModuleService<I, O> implements TypedModuleSer
                                                  ", 실제: " + result.getClass().getSimpleName());
             }
             
-        } catch (IllegalArgumentException e) {
-            log.error("[{}] 입력 검증 오류: {}", serviceId, e.getMessage());
-            throw e;
-            
         } catch (Exception e) {
-            log.error("[{}] 처리 중 오류 발생", serviceId, e);
-            throw new RuntimeException(serviceId + " 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+            // BIZ용 메서드에서도 동일한 에러 처리 적용
+            throw handleErrorForBiz(serviceId, e, input);
+        }
+    }
+    
+    /**
+     * BIZ 레이어용 에러 처리 (RuntimeException 형태로 던짐)
+     */
+    private RuntimeException handleErrorForBiz(String serviceId, Exception e, Object inputData) {
+        if (errorHandler != null) {
+            // ErrorHandler를 통한 에러 분류 및 처리 (HTTP용과 동일)
+            ModuleException moduleEx = errorHandler.handleException(serviceId, e, inputData);
+            errorHandler.logError(serviceId, moduleEx);
+            
+            // BIZ 레이어에서는 ModuleException을 그대로 던짐 (호출자가 처리할 수 있도록)
+            return moduleEx;
+            
+        } else {
+            // Fallback: ErrorHandler가 없는 경우
+            if (e instanceof IllegalArgumentException) {
+                return (IllegalArgumentException) e;
+            } else if (e instanceof RuntimeException) {
+                return (RuntimeException) e;
+            } else {
+                return new RuntimeException(serviceId + " 처리 중 오류가 발생했습니다: " + e.getMessage(), e);
+            }
         }
     }
     
